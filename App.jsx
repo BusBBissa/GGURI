@@ -179,7 +179,7 @@ export default function App() {
               <div style={{marginTop:"10px"}}>
                 <h4>{selectedDate}</h4>
                 {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
-                <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px'}}/>
+                <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
                 <button onClick={()=>{setEvents([...events,{text:eventText,date:selectedDate}]); setEventText("")}} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
               </div>
             )}
