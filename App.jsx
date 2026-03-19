@@ -296,4 +296,18 @@ export default function App() {
         </div>
       )}
 
-      <button onClick={createCouple} style={{ position:"fixed", bottom:"20px", right:"20px", background:"#ff8fa3", color:"#fff",
+      <button
+  onClick={createCouple}
+  style={{
+    position: "fixed",
+    bottom: "20px",
+    right: "20px",
+    background: "#ff8fa3",
+    color: "#fff",
+    border: "none",
+    padding: "16px",
+    borderRadius: "50%",
+  }}
+>
+  +
+</button>
