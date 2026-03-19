@@ -32,7 +32,7 @@ export default function App() {
 
   const [tasks, setTasks] = useState([]);
   const [taskText, setTaskText] = useState("");
-  const [category, setCategory] = useState("스드메");
+  const [category, setCategory] = useState("");
 
   const [budgetItems, setBudgetItems] = useState([]);
   const [budgetName, setBudgetName] = useState("");
@@ -129,7 +129,7 @@ export default function App() {
       {/* 홈 */}
       {tab==="home" && (
         <div>
-          {/* 사진 업로드 버튼 + 미리보기 */}
+          {/* 사진 업로드 버튼 + 썸네일 */}
           <div style={{marginBottom:"20px"}}>
             <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
               사진 추가
@@ -148,10 +148,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* 사진 슬라이드 */}
+          {/* 사진 표시 구역 */}
           {images.length>0 && (
-            <div style={{position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px"}}>
-              <img src={images[currentImage]} style={{width:"100%", maxHeight:"300px", objectFit:"contain"}} />
+            <div style={{position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px", height:"50vh", background:"#f9f9f9", display:"flex", justifyContent:"center", alignItems:"center"}}>
+              <img src={images[currentImage]} style={{maxWidth:"100%", maxHeight:"100%", objectFit:"contain"}} />
             </div>
           )}
 
@@ -190,25 +190,25 @@ export default function App() {
       {/* 할일 */}
       {tab==="tasks" && (
         <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-          <select value={category} onChange={e=>setCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", marginRight:"5px"}}>
-            <option>스드메</option><option>웨딩홀</option><option>신혼여행</option><option>예물</option><option>혼수</option>
-          </select>
-          <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"60%", marginRight:"5px"}}/>
-          <button onClick={()=>{setTasks([...tasks,{text:taskText,category,done:false}]); setTaskText("")}} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+          <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
+            <input placeholder="카테고리" value={category} onChange={e=>setCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:"1"}}/>
+            <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:"2"}}/>
+            <button onClick={()=>{
+              if(taskText.trim()==="") return;
+              setTasks([...tasks,{text:taskText,category,done:false}]); 
+              setTaskText(""); 
+              setCategory("");
+            }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+          </div>
 
           <div style={{marginTop:"10px"}}>
-            {Object.entries(tasks.reduce((acc,t)=>{acc[t.category]=acc[t.category]||[]; acc[t.category].push(t); return acc;},{})).map(([cat,list])=>(
-              <div key={cat} style={{marginBottom:"10px"}}>
-                <b>{cat}</b>
-                {list.map((t,i)=>(
-                  <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0"}}>
-                    <span style={{textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
-                    <div>
-                      <button onClick={()=>{let x=[...tasks]; x[tasks.indexOf(t)].done=!x[tasks.indexOf(t)].done; setTasks(x)}}>{t.done?"완료":"미완료"}</button>
-                      <button onClick={()=>setTasks(tasks.filter(task=>task!==t))}>삭제</button>
-                    </div>
-                  </div>
-                ))}
+            {tasks.map((t,i)=>(
+              <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0"}}>
+                <span style={{textDecoration:t.done?"line-through":"none"}}><b>{t.category}</b> : {t.text}</span>
+                <div>
+                  <button onClick={()=>{let x=[...tasks]; x[i].done=!x[i].done; setTasks(x)}}>{t.done?"완료":"미완료"}</button>
+                  <button onClick={()=>setTasks(tasks.filter((_,index)=>index!==i))}>삭제</button>
+                </div>
               </div>
             ))}
           </div>
