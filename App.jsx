@@ -91,6 +91,7 @@ function TabBar({ tab, setTab, logout }) {
     </div>
   );
 }
+
 // ---------------- HomeTab ----------------
 function HomeTab({ coupleId }) {
   const [images, setImages] = useState([]);
@@ -104,11 +105,13 @@ function HomeTab({ coupleId }) {
   // LocalStorage 키
   const storageKey = `wedding_images_${coupleId}`;
 
-  // 불러오기
+  // 초기 데이터 불러오기
   useEffect(() => {
+    // LocalStorage에서 이미지 불러오기
     const saved = localStorage.getItem(storageKey);
     if (saved) setImages(JSON.parse(saved));
 
+    // Firestore에서 이벤트, 웨딩 날짜 불러오기
     const load = async () => {
       const snap = await getDoc(doc(db, "couples", coupleId));
       if (snap.exists()) {
@@ -120,23 +123,26 @@ function HomeTab({ coupleId }) {
     load();
   }, [coupleId]);
 
-  // LocalStorage에 저장
+  // LocalStorage에 이미지 저장
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(images));
   }, [images]);
 
-  const saveField = async (field, value) => { 
-    await updateDoc(doc(db, "couples", coupleId), { [field]: value }); 
+  // Firebase에 이벤트/웨딩날짜 저장
+  const saveField = async (field, value) => {
+    await updateDoc(doc(db, "couples", coupleId), { [field]: value });
   };
   useEffect(() => { if(events.length) saveField("events", events); }, [events]);
   useEffect(() => { if(weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
 
+  // 사진 슬라이드
   useEffect(() => {
     if(images.length < 2) return;
     const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
     return () => clearInterval(interval);
   }, [images]);
 
+  // 이미지 업로드(LocalStorage용)
   const uploadImage = (file) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -144,6 +150,14 @@ function HomeTab({ coupleId }) {
     };
     reader.readAsDataURL(file);
   };
+
+  // 달력용 변수
+  const baseDate = new Date();
+  baseDate.setMonth(baseDate.getMonth() + monthOffset);
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dday = weddingDate ? Math.ceil((new Date(weddingDate) - new Date()) / (1000*60*60*24)) : null;
 
   return (
     <div>
@@ -203,7 +217,6 @@ function HomeTab({ coupleId }) {
     </div>
   );
 }
-
 
 // ---------------- TasksTab ----------------
 function TasksTab({ coupleId }) {
