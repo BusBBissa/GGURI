@@ -454,21 +454,21 @@ function BudgetTab({ coupleId }) {
   const totalBudget = budgetItems.reduce((acc, b) => acc + Number(b.cost || 0), 0);
 
   return (
-    <div style={{ background: "white", padding: "15px", borderRadius: "20px" }}>
+    <div style={{ padding: "15px" }}>
       {/* 입력창 */}
       <div style={{ display: "flex", gap: "5px", marginBottom: "10px" }}>
         <input
           placeholder="항목명"
           value={budgetName}
           onChange={e => setBudgetName(e.target.value)}
-          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd" }}
+          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex: 2 }}
         />
         <input
           placeholder="금액"
           type="number"
           value={budgetCost}
           onChange={e => setBudgetCost(e.target.value)}
-          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd" }}
+          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex: 1 }}
         />
         <button
           onClick={handleAdd}
@@ -483,12 +483,22 @@ function BudgetTab({ coupleId }) {
         총 예산: {totalBudget.toLocaleString()}원
       </div>
 
-      {/* 리스트 */}
-      <div>
+      {/* 2단 레이아웃 리스트 */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
         {budgetItems.map((b, i) => (
-          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #eee" }}>
-            <span>{b.name}</span>
-            <span>{Number(b.cost).toLocaleString()}원</span>
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "8px 10px",
+              borderRadius: "12px",
+              background: "#fff",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.05)"
+            }}
+          >
+            <span style={{ fontWeight: "500" }}>{b.name}</span>
+            <span style={{ fontWeight: "500" }}>{Number(b.cost).toLocaleString()}원</span>
           </div>
         ))}
       </div>
