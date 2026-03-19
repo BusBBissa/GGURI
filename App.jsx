@@ -92,7 +92,12 @@ function TabBar({ tab, setTab, logout }) {
   );
 }
 // ---------------- HomeTab ----------------
-function HomeTab({ coupleId }) {
+import React, { useState, useEffect } from "react";
+import { db, storage } from './firebase'; // firebase.js에서 초기화한 객체
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+
+export default function HomeTab({ coupleId }) {
   const [images, setImages] = useState([]);
   const [currentImage, setCurrentImage] = useState(0);
   const [weddingDate, setWeddingDate] = useState("");
@@ -101,57 +106,28 @@ function HomeTab({ coupleId }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
 
-  // Firestore 문서 참조
-  const coupleDoc = doc(db, "couples", coupleId);
-
   // ---------------- 초기 데이터 불러오기 ----------------
   useEffect(() => {
     const load = async () => {
-      const snap = await getDoc(coupleDoc);
+      const snap = await getDoc(doc(db, "couples", coupleId));
       if (snap.exists()) {
-        const data = snap.data();
-        setWeddingDate(data.weddingDate || "");
-        setEvents(data.events || []);
-        setImages(data.images || []); // Storage URL 배열
+        const d = snap.data();
+        setWeddingDate(d.weddingDate || "");
+        setEvents(d.events || []);
+        setImages(d.images || []);
       }
     };
     load();
   }, [coupleId]);
 
-  // ---------------- 저장 함수 ----------------
-  const saveField = async (field, value) => {
-    await updateDoc(coupleDoc, { [field]: value });
+  // ---------------- Firestore에 저장 ----------------
+  const saveField = async (field, value) => { 
+    await updateDoc(doc(db, "couples", coupleId), { [field]: value }); 
   };
 
-  useEffect(() => { if(events.length) saveField("events", events); }, [events]);
   useEffect(() => { if(weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
+  useEffect(() => { if(events.length) saveField("events", events); }, [events]);
   useEffect(() => { if(images.length) saveField("images", images); }, [images]);
-
-  // ---------------- 사진 업로드 ----------------
-  const uploadImage = async (file) => {
-    try {
-      const storageRef = ref(storage, `couples/${coupleId}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      setImages(prev => [...prev, url]);
-    } catch (err) {
-      console.error("사진 업로드 실패:", err);
-      alert("사진 업로드에 실패했습니다.");
-    }
-  };
-
-  // ---------------- 사진 삭제 ----------------
-  const deleteImage = async (idx) => {
-    const url = images[idx];
-    // Storage에서 삭제
-    try {
-      const storageRef = ref(storage, url);
-      await storageRef.delete(); // Firebase v9에서는 delete 함수 별도 import 필요
-    } catch(e) {
-      // Storage에서 삭제 실패해도 Firestore에서만 제거
-    }
-    setImages(prev => prev.filter((_,i)=>i!==idx));
-  };
 
   // ---------------- 사진 슬라이드 ----------------
   useEffect(() => {
@@ -160,13 +136,34 @@ function HomeTab({ coupleId }) {
     return () => clearInterval(interval);
   }, [images]);
 
+  // ---------------- 사진 업로드 ----------------
+  const uploadImage = async (file) => {
+    try {
+      const storageRef = ref(storage, `couples/${coupleId}/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setImages(prev => [...prev, url]);
+    } catch(e) {
+      alert("사진 업로드 실패: " + e.message);
+    }
+  };
+
+  // ---------------- 사진 삭제 ----------------
+  const deleteImage = async (url) => {
+    try {
+      const storageRef = ref(storage, url.split("com/")[1]);
+      await deleteObject(storageRef);
+    } catch {}
+    setImages(prev => prev.filter(i => i !== url));
+  };
+
   // ---------------- 달력 계산 ----------------
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   const year = firstDay.getFullYear();
   const month = firstDay.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = firstDay.getDay(); // 0~6
+  const firstDayOfMonth = firstDay.getDay();
   const weekdays = ["일","월","화","수","목","금","토"];
 
   return (
@@ -181,7 +178,7 @@ function HomeTab({ coupleId }) {
           {images.map((img, idx)=>(
             <div key={idx} style={{position:"relative"}}>
               <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
-              <button onClick={()=>deleteImage(idx)} style={{position:"absolute", top:0, right:0, background:"red", color:"white", border:"none", borderRadius:"50%", width:"20px", height:"20px", cursor:"pointer"}}>×</button>
+              <button onClick={()=>deleteImage(img)} style={{position:"absolute", top:0, right:0, background:"#ff6f91", border:"none", borderRadius:"50%", width:"20px", height:"20px", color:"#fff", cursor:"pointer"}}>×</button>
             </div>
           ))}
         </div>
@@ -202,6 +199,7 @@ function HomeTab({ coupleId }) {
 
       {/* 달력 */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
+        {/* 이전/다음 달 버튼 */}
         <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
           <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
           <h3>{year}년 {month+1}월</h3>
@@ -211,19 +209,25 @@ function HomeTab({ coupleId }) {
         {/* 요일 */}
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:"5px", textAlign:"center", fontWeight:"bold"}}>
           {weekdays.map((d,i)=>(
-            <div key={i} style={{padding:"5px", color:i===0?"red":i===6?"blue":"black"}}>{d}</div>
+            <div key={i} style={{padding:"5px", color: i===0?"red":i===6?"blue":"black"}}>{d}</div>
           ))}
         </div>
 
         {/* 날짜 */}
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
-          {Array(firstDayOfMonth).fill(null).map((_,i)=><div key={"blank"+i}></div>)}
+          {Array(firstDayOfMonth).fill(null).map((_,i)=>(<div key={"blank"+i}></div>))}
           {Array(daysInMonth).fill(null).map((_,i)=>{
             const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
             const hasEvent = events.find(e=>e.date===date);
             return (
-              <div key={i} onClick={()=>setSelectedDate(date)}
-                style={{padding:"12px", borderRadius:"10px", background: hasEvent ? "#ffccd5" : "#f9f9f9", textAlign:"center", cursor:"pointer"}}
+              <div key={i} onClick={()=>setSelectedDate(date)} 
+                style={{
+                  padding:"12px",
+                  borderRadius:"10px",
+                  background: hasEvent ? "#ffccd5" : "#f9f9f9",
+                  textAlign:"center",
+                  cursor:"pointer"
+                }}
               >
                 {i+1}
               </div>
@@ -248,7 +252,6 @@ function HomeTab({ coupleId }) {
     </div>
   );
 }
-
 // ---------------- TasksTab ----------------
 function TasksTab({ coupleId }) {
   const [tasks, setTasks] = useState([]);
