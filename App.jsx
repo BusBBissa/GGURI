@@ -254,180 +254,150 @@ function TasksTab({ coupleId }) {
   const [taskText, setTaskText] = useState("");
   const [taskCategory, setTaskCategory] = useState("");
 
-  // Firestore에서 불러오기
+  // Firestore + LocalStorage에서 불러오기
   useEffect(() => {
+    const saved = localStorage.getItem(`tasks_${coupleId}`);
+    if (saved) setTasks(JSON.parse(saved));
+
     const load = async () => {
-      const snap = await getDoc(doc(db,"couples",coupleId));
-      if(snap.exists()) setTasks(snap.data().tasks || []);
+      const snap = await getDoc(doc(db, "couples", coupleId));
+      if (snap.exists()) setTasks(snap.data().tasks || []);
     };
     load();
   }, [coupleId]);
 
-  // Firestore에 저장
+  // 저장
   useEffect(() => {
-    updateDoc(doc(db,"couples",coupleId), {tasks});
+    localStorage.setItem(`tasks_${coupleId}`, JSON.stringify(tasks));
+    updateDoc(doc(db, "couples", coupleId), { tasks });
   }, [tasks, coupleId]);
 
-  // 완료 상태 토글
-  const toggleDone = (task) => {
-    setTasks(prev => prev.map(t => t===task ? {...t, done: !t.done} : t));
+  const addTask = () => {
+    if (!taskText || !taskCategory) return;
+    setTasks(prev => [...prev, { text: taskText, category: taskCategory, done: false }]);
+    setTaskText(""); setTaskCategory("");
   };
 
-  // 삭제
-  const deleteTask = (task) => {
-    setTasks(prev => prev.filter(t => t !== task));
-  };
+  const toggleDone = (t) => setTasks(prev => prev.map(item => item===t ? {...item, done: !item.done} : item));
+  const deleteTask = (t) => setTasks(prev => prev.filter(item => item!==t));
 
   // 카테고리별 그룹화
-  const grouped = tasks.reduce((acc, t) => {
-    acc[t.category] = acc[t.category] || [];
-    acc[t.category].push(t);
-    return acc;
-  }, {});
+  const grouped = tasks.reduce((acc, t) => { acc[t.category] = acc[t.category] || []; acc[t.category].push(t); return acc; }, {});
 
   return (
     <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-      {/* 입력창 */}
-      <div style={{display:"flex", gap:"5px", marginBottom:"15px", flexWrap:"wrap"}}>
-        <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
-        <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
-        <button onClick={()=>{
-          if(!taskText || !taskCategory) return;
-          setTasks(prev => [...prev,{text:taskText,category:taskCategory,done:false}]);
-          setTaskText(""); setTaskCategory("");
-        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+      <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
+        <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}/>
+        <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd", flex:1}}/>
+        <button onClick={addTask} style={{padding:"8px 15px",borderRadius:"12px",background:"#ff8fa3",color:"#fff",border:"none",cursor:"pointer"}}>➕ 추가</button>
       </div>
 
-      {/* 카테고리별 그룹 표시 */}
-      {Object.entries(grouped).map(([cat, list]) => (
-        <div key={cat} style={{marginBottom:"15px"}}>
-          <b style={{display:"block", marginBottom:"5px"}}>{cat}</b>
-          <div style={{display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:"10px"}}>
+      {/* 2단 레이아웃 */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
+        {Object.entries(grouped).map(([cat,list])=>(
+          <div key={cat}>
+            <b>{cat}</b>
             {list.map((t,i)=>(
-              <div key={i} style={{
-                padding:"10px",
-                borderRadius:"12px",
-                background:"#fff0f5",
-                display:"flex",
-                justifyContent:"space-between",
-                alignItems:"center",
-                cursor:"pointer",
-                boxShadow:"0 2px 5px rgba(0,0,0,0.05)"
-              }}>
-                <span onClick={()=>toggleDone(t)} style={{
-                  textDecoration: t.done ? "line-through" : "none",
-                  color: t.done ? "#888" : "#000",
-                  flex:1,
-                  marginRight:"5px"
-                }}>
-                  {t.text}
-                </span>
-                <button onClick={()=>deleteTask(t)} style={{
-                  background:"red",
-                  border:"none",
-                  color:"#fff",
-                  borderRadius:"6px",
-                  padding:"2px 6px",
-                  cursor:"pointer",
-                  fontSize:"12px"
-                }}>×</button>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px",margin:"5px 0",borderRadius:"12px",background:"#f9f9f9",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
+                <span style={{textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
+                <div style={{display:"flex",gap:"5px"}}>
+                  <button onClick={()=>toggleDone(t)} style={{padding:"2px 6px",borderRadius:"6px",background:t.done?"#b3ffb3":"#ffd1dc",border:"none",cursor:"pointer"}}>
+                    {t.done?"완료":"미완료"}
+                  </button>
+                  <button onClick={()=>deleteTask(t)} style={{padding:"2px 6px",borderRadius:"6px",background:"#ffb3c1",border:"none",cursor:"pointer"}}>❌</button>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
 // ---------------- GuestsTab ----------------
 function GuestsTab({ coupleId }) {
   const [guests, setGuests] = useState([]);
-  const [guestName, setGuestName] = useState("");
+  const [guestText, setGuestText] = useState("");
   const [guestCategory, setGuestCategory] = useState("");
+  const [guestParent, setGuestParent] = useState("신랑"); // 입력시 선택
+  const [guestSearch, setGuestSearch] = useState("");
 
-  // Firestore에서 불러오기
+  // 불러오기
   useEffect(() => {
+    const saved = localStorage.getItem(`guests_${coupleId}`);
+    if (saved) setGuests(JSON.parse(saved));
+
     const load = async () => {
       const snap = await getDoc(doc(db,"couples",coupleId));
-      if(snap.exists()) setGuests(snap.data().guests || []);
+      if (snap.exists()) setGuests(snap.data().guests || []);
     };
     load();
   }, [coupleId]);
 
-  // Firestore에 저장
+  // 저장
   useEffect(() => {
+    localStorage.setItem(`guests_${coupleId}`, JSON.stringify(guests));
     updateDoc(doc(db,"couples",coupleId), {guests});
   }, [guests, coupleId]);
 
-  // 상태 토글: 참석예정 <-> 미정
-  const toggleStatus = (guest) => {
-    setGuests(prev => prev.map(g => g === guest ? {...g, status: g.status==="참석예정" ? "미정" : "참석예정"} : g));
+  // 추가
+  const addGuest = () => {
+    if (!guestText || !guestCategory) return;
+    setGuests(prev => [...prev,{name:guestText,parent:guestParent,category:guestCategory,status:"미정"}]);
+    setGuestText(""); setGuestCategory(""); setGuestParent("신랑");
+  };
+
+  // 상태 토글
+  const toggleStatus = (g) => {
+    const next = g.status==="미정"?"참석예정":g.status==="참석예정"?"불참":"미정";
+    setGuests(prev => prev.map(item => item===g ? {...item,status:next} : item));
   };
 
   // 삭제
-  const deleteGuest = (guest) => {
-    setGuests(prev => prev.filter(g => g !== guest));
-  };
+  const deleteGuest = (g) => setGuests(prev => prev.filter(item => item!==g));
 
-  // 신랑/신부, 카테고리별 그룹화
-  const grouped = { 신랑: {}, 신부: {} };
+  // 신랑/신부별 그룹화 -> 카테고리별 그룹화
+  const grouped = { "신랑": {}, "신부": {} };
   guests.forEach(g => {
-    const side = g.parent || "신랑";
-    grouped[side][g.category] = grouped[side][g.category] || [];
-    grouped[side][g.category].push(g);
+    if (!grouped[g.parent][g.category]) grouped[g.parent][g.category] = [];
+    grouped[g.parent][g.category].push(g);
   });
 
   return (
     <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-      {/* 입력창 */}
-      <div style={{display:"flex", gap:"5px", marginBottom:"15px", flexWrap:"wrap"}}>
-        <input placeholder="이름" value={guestName} onChange={e=>setGuestName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
+      {/* 입력 */}
+      <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
+        <select value={guestParent} onChange={e=>setGuestParent(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}>
+          <option>신랑</option>
+          <option>신부</option>
+        </select>
         <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
-        <button onClick={()=>{
-          if(!guestName || !guestCategory) return;
-          setGuests(prev => [...prev,{name:guestName, category:guestCategory, parent:"신랑", status:"참석예정"}]);
-          setGuestName(""); setGuestCategory("");
-        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+        <input placeholder="이름" value={guestText} onChange={e=>setGuestText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
+        <button onClick={addGuest} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
       </div>
 
-      {/* 신랑 / 신부 영역 */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px"}}>
-        {["신랑","신부"].map(side => (
-          <div key={side}>
-            <h3 style={{textAlign:"center", marginBottom:"10px"}}>{side}</h3>
-            {Object.entries(grouped[side]).map(([cat, list]) => (
-              <div key={cat} style={{marginBottom:"15px"}}>
-                <b style={{display:"block", marginBottom:"5px"}}>{cat}</b>
-                <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"10px"}}>
-                  {list.map((g,i)=>(
-                    <div key={i} style={{
-                      padding:"10px",
-                      borderRadius:"12px",
-                      background:"#fff0f5",
-                      display:"flex",
-                      justifyContent:"space-between",
-                      alignItems:"center",
-                      boxShadow:"0 2px 5px rgba(0,0,0,0.05)",
-                      cursor:"pointer"
-                    }}>
-                      <span onClick={()=>toggleStatus(g)} style={{
-                        flex:1,
-                        marginRight:"5px",
-                        color: g.status==="참석예정" ? "#000" : "#888",
-                        textDecoration: g.status==="참석예정" ? "none" : "line-through"
-                      }}>{g.name} ({g.status})</span>
-                      <button onClick={()=>deleteGuest(g)} style={{
-                        background:"red",
-                        border:"none",
-                        color:"#fff",
-                        borderRadius:"6px",
-                        padding:"2px 6px",
-                        cursor:"pointer",
-                        fontSize:"12px"
-                      }}>×</button>
+      {/* 검색 */}
+      <input placeholder="검색" value={guestSearch} onChange={e=>setGuestSearch(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"100%", marginBottom:"10px"}}/>
+
+      {/* 2단 레이아웃: 좌측 신랑, 우측 신부 */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
+        {["신랑","신부"].map(parent => (
+          <div key={parent}>
+            <h3>{parent}</h3>
+            {Object.entries(grouped[parent]).map(([cat,list])=>(
+              <div key={cat} style={{marginBottom:"10px"}}>
+                <b>{cat}</b>
+                {list.filter(g=>g.name.includes(guestSearch) || g.category.includes(guestSearch)).map((g,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px",margin:"5px 0",borderRadius:"12px",background:"#f9f9f9",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
+                    <span>{g.name}</span>
+                    <div style={{display:"flex", gap:"5px"}}>
+                      <button onClick={()=>toggleStatus(g)} style={{padding:"2px 6px",borderRadius:"6px",background:g.status==="참석예정"?"#b3ffb3":g.status==="불참"?"#ffd1dc":"#fff",border:"1px solid #ddd",cursor:"pointer"}}>
+                        {g.status}
+                      </button>
+                      <button onClick={()=>deleteGuest(g)} style={{padding:"2px 6px",borderRadius:"6px",background:"#ffb3c1",border:"none",cursor:"pointer"}}>❌</button>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
