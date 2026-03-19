@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getFirestore, doc, getDoc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
 
 // ---------------- Firebase 초기화 ----------------
 const firebaseConfig = {
@@ -13,7 +12,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
 // ---------------- App ----------------
@@ -32,9 +30,17 @@ export default function App() {
     const id = Math.random().toString(36).slice(2, 8);
     setCoupleId(id);
     navigator.clipboard.writeText(id);
-    await setDoc(doc(db, "couples", id), {});
+    await setDoc(doc(db, "couples", id), {
+      weddingDate: "",
+      events: [],
+      images: [],
+      tasks: [],
+      guests: [],
+      budgetItems: []
+    });
     alert("초대 코드: " + id);
   };
+
   const joinCouple = () => setCoupleId(inputCoupleId);
 
   if (!user) return <AuthPage login={login} />;
@@ -91,6 +97,7 @@ function TabBar({ tab, setTab, logout }) {
     </div>
   );
 }
+
 // ---------------- HomeTab ----------------
 function HomeTab({ coupleId }) {
   const [images, setImages] = useState([]);
@@ -101,318 +108,208 @@ function HomeTab({ coupleId }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
 
-  const storageKey = `wedding_images_${coupleId}`;
-
-  // ---------------- 초기 데이터 불러오기 ----------------
+  // Firestore 실시간 구독
   useEffect(() => {
-    // 1. localStorage에서 사진 불러오기
-    const savedImages = localStorage.getItem(storageKey);
-    if (savedImages) setImages(JSON.parse(savedImages));
-
-    // 2. Firestore에서 D-day와 이벤트 불러오기
-    const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
+    const unsubscribe = onSnapshot(doc(db, "couples", coupleId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        setEvents(data.events || []);
         setWeddingDate(data.weddingDate || "");
+        setEvents(data.events || []);
+        setImages(data.images || []);
       }
-    };
-    load();
+    });
+    return () => unsubscribe();
   }, [coupleId]);
 
-  // ---------------- 사진 localStorage 저장 ----------------
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(images));
-  }, [images]);
-
-  // ---------------- Firestore 저장 ----------------
   const saveField = async (field, value) => {
-    await updateDoc(doc(db, "couples", coupleId), { [field]: value });
+    try { await updateDoc(doc(db, "couples", coupleId), { [field]: value }); }
+    catch(err){ console.error(err); alert(`${field} 저장 실패!`);}
   };
 
-  useEffect(() => { if (events.length) saveField("events", events); }, [events]);
-  useEffect(() => { if (weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
+  useEffect(() => saveField("weddingDate", weddingDate), [weddingDate]);
+  useEffect(() => saveField("events", events), [events]);
+  useEffect(() => saveField("images", images), [images]);
 
-  // ---------------- 사진 슬라이드 ----------------
-  useEffect(() => {
-    if (images.length < 2) return;
-    const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
-    return () => clearInterval(interval);
-  }, [images]);
-
-  // ---------------- 사진 업로드 ----------------
   const uploadImage = (file) => {
-    const img = new Image();
+    if(!file.type.startsWith("image/")) return alert("이미지 파일만 업로드 가능");
     const reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = e=>{
+      const img = new Image();
       img.src = e.target.result;
       img.onload = () => {
-        // 최대 너비 800px, 비율 유지
         const canvas = document.createElement("canvas");
-        const scale = Math.min(1, 800 / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.8); // 용량 줄이기
-        setImages(prev => [...prev, resizedDataUrl]);
-      };
+        const scale = Math.min(1, 800/img.width);
+        canvas.width = img.width*scale;
+        canvas.height = img.height*scale;
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        setImages(prev=>[...prev, canvas.toDataURL("image/jpeg",0.8)]);
+      }
     };
     reader.readAsDataURL(file);
   };
 
-  const deleteImage = (idx) => {
-    setImages(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  // ---------------- 달력 계산 ----------------
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   const year = firstDay.getFullYear();
   const month = firstDay.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = firstDay.getDay(); // 1일 요일
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const firstDayOfMonth = firstDay.getDay();
   const weekdays = ["일","월","화","수","목","금","토"];
 
   return (
     <div>
-      {/* 사진 업로드 */}
       <div style={{marginBottom:"20px"}}>
         <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
           사진 추가
-          <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ if(e.target.files[0]) uploadImage(e.target.files[0]); }} />
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0] && uploadImage(e.target.files[0])}/>
         </label>
         <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
-          {images.map((img, idx)=>(
+          {images.map((img, idx)=>
             <div key={idx} style={{position:"relative"}}>
               <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
-              <button onClick={()=>deleteImage(idx)} style={{position:"absolute", top:"-5px", right:"-5px", background:"red", color:"white", borderRadius:"50%", width:"20px", height:"20px", border:"none", cursor:"pointer"}}>×</button>
+              <button onClick={()=>setImages(prev=>prev.filter((_,i)=>i!==idx))} style={{position:"absolute", top:"-5px", right:"-5px", background:"red", color:"white", borderRadius:"50%", width:"20px", height:"20px", border:"none", cursor:"pointer"}}>×</button>
             </div>
-          ))}
+          )}
         </div>
       </div>
+      {images.length>0 && <div style={{width:"100%", maxHeight:"50vh", borderRadius:"20px", overflow:"hidden", marginBottom:"20px", display:"flex", justifyContent:"center", alignItems:"center", background:"#fff"}}><img src={images[currentImage]} style={{maxWidth:"100%", maxHeight:"100%", objectFit:"contain"}} /></div>}
 
-      {/* 사진 슬라이드 */}
-      {images.length>0 && (
-        <div style={{width:"100%", maxHeight:"50vh", borderRadius:"20px", overflow:"hidden", marginBottom:"20px", display:"flex", justifyContent:"center", alignItems:"center", background:"#fff"}}>
-          <img src={images[currentImage]} style={{maxWidth:"100%", maxHeight:"100%", objectFit:"contain"}} />
-        </div>
-      )}
-
-      {/* D-day */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
         <h2>D-{weddingDate ? Math.floor((new Date(weddingDate)-new Date())/(1000*60*60*24)) : "?"}</h2>
         <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
       </div>
 
-      {/* 달력 */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
-        {/* 이전/다음 달 버튼 */}
         <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
           <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
           <h3>{year}년 {month+1}월</h3>
           <button onClick={()=>setMonthOffset(monthOffset+1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>다음달 ▶</button>
         </div>
-
-        {/* 요일 */}
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:"5px", textAlign:"center", fontWeight:"bold"}}>
-          {weekdays.map((d,i)=>(
-            <div key={i} style={{padding:"5px", color: i===0?"red":i===6?"blue":"black"}}>{d}</div>
-          ))}
+          {weekdays.map((d,i)=><div key={i} style={{padding:"5px", color:i===0?"red":i===6?"blue":"black"}}>{d}</div>)}
         </div>
-
-        {/* 날짜 */}
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
           {Array(firstDayOfMonth).fill(null).map((_,i)=><div key={"blank"+i}></div>)}
           {Array(daysInMonth).fill(null).map((_,i)=>{
             const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
             const hasEvent = events.find(e=>e.date===date);
             return (
-              <div key={i} onClick={()=>setSelectedDate(date)} 
-                style={{
-                  padding:"12px",
-                  borderRadius:"10px",
-                  background: hasEvent ? "#ffccd5" : "#f9f9f9",
-                  textAlign:"center",
-                  cursor:"pointer"
-                }}
-              >
-                {i+1}
-              </div>
+              <div key={i} onClick={()=>setSelectedDate(date)} style={{padding:"12px", borderRadius:"10px", background: hasEvent?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer"}}>{i+1}</div>
             )
           })}
         </div>
-
-        {/* 선택 날짜 이벤트 */}
-        {selectedDate && (
-          <div style={{marginTop:"10px"}}>
-            <h4>{selectedDate}</h4>
-            {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
-            <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
-            <button onClick={()=>{
-              if(!eventText) return;
-              setEvents(prev => [...prev,{text:eventText,date:selectedDate}]);
-              setEventText("");
-            }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
-          </div>
-        )}
+        {selectedDate && <div style={{marginTop:"10px"}}>
+          <h4>{selectedDate}</h4>
+          {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
+          <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+          <button onClick={()=>{
+            if(!eventText) return;
+            setEvents(prev=>[...prev,{text:eventText,date:selectedDate}]);
+            setEventText("");
+          }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
+        </div>}
       </div>
     </div>
   );
 }
+
 // ---------------- TasksTab ----------------
 function TasksTab({ coupleId }) {
   const [tasks, setTasks] = useState([]);
   const [taskText, setTaskText] = useState("");
   const [taskCategory, setTaskCategory] = useState("");
 
-  // Firestore + LocalStorage에서 불러오기
-  useEffect(() => {
-    const saved = localStorage.getItem(`tasks_${coupleId}`);
-    if (saved) setTasks(JSON.parse(saved));
+  useEffect(()=>{
+    const unsubscribe = onSnapshot(doc(db,"couples",coupleId),(snap)=>{
+      if(snap.exists()){
+        setTasks(snap.data().tasks || []);
+      }
+    });
+    return () => unsubscribe();
+  },[coupleId]);
 
-    const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
-      if (snap.exists()) setTasks(snap.data().tasks || []);
-    };
-    load();
-  }, [coupleId]);
+  useEffect(()=>{ updateDoc(doc(db,"couples",coupleId), {tasks}); },[tasks,coupleId]);
 
-  // 저장
-  useEffect(() => {
-    localStorage.setItem(`tasks_${coupleId}`, JSON.stringify(tasks));
-    updateDoc(doc(db, "couples", coupleId), { tasks });
-  }, [tasks, coupleId]);
+  const addTask = () => { if(!taskText||!taskCategory) return; setTasks(prev=>[...prev,{text:taskText,category:taskCategory,done:false}]); setTaskText(""); setTaskCategory(""); };
+  const toggleDone = t => setTasks(prev=>prev.map(item=>item===t?{...item,done:!item.done}:item));
+  const deleteTask = t => setTasks(prev=>prev.filter(item=>item!==t));
 
-  const addTask = () => {
-    if (!taskText || !taskCategory) return;
-    setTasks(prev => [...prev, { text: taskText, category: taskCategory, done: false }]);
-    setTaskText(""); setTaskCategory("");
-  };
+  const grouped = tasks.reduce((acc,t)=>{ acc[t.category] = acc[t.category]||[]; acc[t.category].push(t); return acc; },{});
 
-  const toggleDone = (t) => setTasks(prev => prev.map(item => item===t ? {...item, done: !item.done} : item));
-  const deleteTask = (t) => setTasks(prev => prev.filter(item => item!==t));
-
-  // 카테고리별 그룹화
-  const grouped = tasks.reduce((acc, t) => { acc[t.category] = acc[t.category] || []; acc[t.category].push(t); return acc; }, {});
-
-  return (
-    <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-      <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
-        <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}/>
-        <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd", flex:1}}/>
-        <button onClick={addTask} style={{padding:"8px 15px",borderRadius:"12px",background:"#ff8fa3",color:"#fff",border:"none",cursor:"pointer"}}>➕ 추가</button>
-      </div>
-
-      {/* 2단 레이아웃 */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
-        {Object.entries(grouped).map(([cat,list])=>(
-          <div key={cat}>
-            <b>{cat}</b>
-            {list.map((t,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px",margin:"5px 0",borderRadius:"12px",background:"#f9f9f9",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
-                <span style={{textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
-                <div style={{display:"flex",gap:"5px"}}>
-                  <button onClick={()=>toggleDone(t)} style={{padding:"2px 6px",borderRadius:"6px",background:t.done?"#b3ffb3":"#ffd1dc",border:"none",cursor:"pointer"}}>
-                    {t.done?"완료":"미완료"}
-                  </button>
-                  <button onClick={()=>deleteTask(t)} style={{padding:"2px 6px",borderRadius:"6px",background:"#ffb3c1",border:"none",cursor:"pointer"}}>❌</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+  return <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
+    <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
+      <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}/>
+      <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd", flex:1}}/>
+      <button onClick={addTask} style={{padding:"8px 15px",borderRadius:"12px",background:"#ff8fa3",color:"#fff",border:"none",cursor:"pointer"}}>➕ 추가</button>
     </div>
-  );
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
+      {Object.entries(grouped).map(([cat,list])=><div key={cat}><b>{cat}</b>{list.map((t,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px",margin:"5px 0",borderRadius:"12px",background:"#f9f9f9",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}><span style={{textDecoration:t.done?"line-through":"none"}}>{t.text}</span><div style={{display:"flex",gap:"5px"}}><button onClick={()=>toggleDone(t)} style={{padding:"2px 6px",borderRadius:"6px",background:t.done?"#b3ffb3":"#ffd1dc",border:"none",cursor:"pointer"}}>{t.done?"완료":"미완료"}</button><button onClick={()=>deleteTask(t)} style={{padding:"2px 6px",borderRadius:"6px",background:"#ffb3c1",border:"none",cursor:"pointer"}}>❌</button></div></div>)}</div>)}
+    </div>
+  </div>;
 }
+
 // ---------------- GuestsTab ----------------
 function GuestsTab({ coupleId }) {
-  const [guests, setGuests] = useState([]);
-  const [guestText, setGuestText] = useState("");
-  const [guestCategory, setGuestCategory] = useState("");
-  const [guestParent, setGuestParent] = useState("신랑"); // 입력시 선택
-  const [guestSearch, setGuestSearch] = useState("");
+  const [guests,setGuests]=useState([]);
+  const [guestText,setGuestText]=useState(""); 
+  const [guestCategory,setGuestCategory]=useState("");
+  const [guestParent,setGuestParent]=useState("신랑");
+  const [guestSearch,setGuestSearch]=useState("");
 
-  // 불러오기
-  useEffect(() => {
-    const saved = localStorage.getItem(`guests_${coupleId}`);
-    if (saved) setGuests(JSON.parse(saved));
+  // Firestore 실시간 구독
+  useEffect(()=>{
+    const unsubscribe = onSnapshot(doc(db,"couples",coupleId),(snap)=>{
+      if(snap.exists()){ 
+        setGuests(snap.data().guests || []); 
+      }
+    });
+    return () => unsubscribe();
+  },[coupleId]);
 
-    const load = async () => {
-      const snap = await getDoc(doc(db,"couples",coupleId));
-      if (snap.exists()) setGuests(snap.data().guests || []);
-    };
-    load();
-  }, [coupleId]);
+  // 변경사항 저장
+  useEffect(()=>{ 
+    updateDoc(doc(db,"couples",coupleId), {guests}); 
+  },[guests,coupleId]);
 
-  // 저장
-  useEffect(() => {
-    localStorage.setItem(`guests_${coupleId}`, JSON.stringify(guests));
-    updateDoc(doc(db,"couples",coupleId), {guests});
-  }, [guests, coupleId]);
-
-  // 추가
-  const addGuest = () => {
-    if (!guestText || !guestCategory) return;
-    setGuests(prev => [...prev,{name:guestText,parent:guestParent,category:guestCategory,status:"미정"}]);
-    setGuestText(""); setGuestCategory(""); setGuestParent("신랑");
+  const addGuest = () => { 
+    if(!guestText||!guestCategory) return; 
+    setGuests(prev=>[...prev,{name:guestText,parent:guestParent,category:guestCategory,status:"미정"}]); 
+    setGuestText(""); setGuestCategory(""); setGuestParent("신랑"); 
   };
 
-  // 상태 토글
-  const toggleStatus = (g) => {
-    const next = g.status==="미정"?"참석예정":g.status==="참석예정"?"불참":"미정";
-    setGuests(prev => prev.map(item => item===g ? {...item,status:next} : item));
+  const toggleStatus = g => {
+    const nextStatus = g.status==="미정"?"확정":g.status==="확정"?"불참":"미정";
+    setGuests(prev=>prev.map(item=>item===g?{...item,status:nextStatus}:item));
   };
 
-  // 삭제
-  const deleteGuest = (g) => setGuests(prev => prev.filter(item => item!==g));
+  const deleteGuest = g => setGuests(prev=>prev.filter(item=>item!==g));
 
-  // 신랑/신부별 그룹화 -> 카테고리별 그룹화
-  const grouped = { "신랑": {}, "신부": {} };
-  guests.forEach(g => {
-    if (!grouped[g.parent][g.category]) grouped[g.parent][g.category] = [];
-    grouped[g.parent][g.category].push(g);
-  });
+  const filteredGuests = guests.filter(g=>g.name.includes(guestSearch) || g.category.includes(guestSearch));
 
   return (
     <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-      {/* 입력 */}
       <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
-        <select value={guestParent} onChange={e=>setGuestParent(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}>
+        <input placeholder="이름" value={guestText} onChange={e=>setGuestText(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}/>
+        <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}/>
+        <select value={guestParent} onChange={e=>setGuestParent(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}>
           <option>신랑</option>
           <option>신부</option>
         </select>
-        <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
-        <input placeholder="이름" value={guestText} onChange={e=>setGuestText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
-        <button onClick={addGuest} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+        <button onClick={addGuest} style={{padding:"8px 15px",borderRadius:"12px",background:"#ff8fa3",color:"#fff",border:"none",cursor:"pointer"}}>➕ 추가</button>
       </div>
-
-      {/* 검색 */}
-      <input placeholder="검색" value={guestSearch} onChange={e=>setGuestSearch(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"100%", marginBottom:"10px"}}/>
-
-      {/* 2단 레이아웃: 좌측 신랑, 우측 신부 */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
-        {["신랑","신부"].map(parent => (
-          <div key={parent}>
-            <h3>{parent}</h3>
-            {Object.entries(grouped[parent]).map(([cat,list])=>(
-              <div key={cat} style={{marginBottom:"10px"}}>
-                <b>{cat}</b>
-                {list.filter(g=>g.name.includes(guestSearch) || g.category.includes(guestSearch)).map((g,i)=>(
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px",margin:"5px 0",borderRadius:"12px",background:"#f9f9f9",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
-                    <span>{g.name}</span>
-                    <div style={{display:"flex", gap:"5px"}}>
-                      <button onClick={()=>toggleStatus(g)} style={{padding:"2px 6px",borderRadius:"6px",background:g.status==="참석예정"?"#b3ffb3":g.status==="불참"?"#ffd1dc":"#fff",border:"1px solid #ddd",cursor:"pointer"}}>
-                        {g.status}
-                      </button>
-                      <button onClick={()=>deleteGuest(g)} style={{padding:"2px 6px",borderRadius:"6px",background:"#ffb3c1",border:"none",cursor:"pointer"}}>❌</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
+      <div style={{marginBottom:"10px"}}>
+        <input placeholder="검색" value={guestSearch} onChange={e=>setGuestSearch(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd", width:"100%"}}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
+        {filteredGuests.map((g,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px",borderRadius:"12px",background:"#f9f9f9",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
+            <div>
+              <b>{g.name}</b> ({g.parent}) [{g.category}] - <span style={{color:g.status==="확정"?"green":g.status==="불참"?"red":"black"}}>{g.status}</span>
+            </div>
+            <div style={{display:"flex",gap:"5px"}}>
+              <button onClick={()=>toggleStatus(g)} style={{padding:"2px 6px",borderRadius:"6px",background:"#ffd1dc",border:"none",cursor:"pointer"}}>상태</button>
+              <button onClick={()=>deleteGuest(g)} style={{padding:"2px 6px",borderRadius:"6px",background:"#ff8fa3",border:"none",cursor:"pointer",color:"white"}}>❌</button>
+            </div>
           </div>
         ))}
       </div>
@@ -422,104 +319,41 @@ function GuestsTab({ coupleId }) {
 
 // ---------------- BudgetTab ----------------
 function BudgetTab({ coupleId }) {
-  const [budgetItems, setBudgetItems] = useState([]);
-  const [budgetName, setBudgetName] = useState("");
-  const [budgetCost, setBudgetCost] = useState("");  
+  const [budgetItems,setBudgetItems]=useState([]);
+  const [itemText,setItemText]=useState("");
+  const [itemCost,setItemCost]=useState("");
 
-  // LocalStorage 키
-  const storageKey = `budget_${coupleId}`;
+  useEffect(()=>{
+    const unsubscribe = onSnapshot(doc(db,"couples",coupleId),(snap)=>{
+      if(snap.exists()){ 
+        setBudgetItems(snap.data().budgetItems || []); 
+      }
+    });
+    return () => unsubscribe();
+  },[coupleId]);
 
-  // 불러오기
-  useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) setBudgetItems(JSON.parse(saved));
+  useEffect(()=>{ updateDoc(doc(db,"couples",coupleId), {budgetItems}); },[budgetItems,coupleId]);
 
-    const load = async () => {
-      const snap = await getDoc(doc(db,"couples",coupleId));
-      if (snap.exists()) setBudgetItems(snap.data().budgetItems || []);
-    };
-    load();
-  }, [coupleId]);
-
-  // 저장
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(budgetItems));
-    updateDoc(doc(db,"couples",coupleId), {budgetItems});
-  }, [budgetItems, coupleId]);
-
-  // 항목 추가
-  const addItem = () => {
-    if (!budgetName || !budgetCost) return;
-    setBudgetItems(prev => [...prev,{name:budgetName,cost:Number(budgetCost)}]);
-    setBudgetName(""); setBudgetCost("");
+  const addItem = () => { 
+    if(!itemText||!itemCost) return; 
+    setBudgetItems(prev=>[...prev,{name:itemText,cost:Number(itemCost)}]); 
+    setItemText(""); setItemCost(""); 
   };
+  const deleteItem = i => setBudgetItems(prev=>prev.filter((_,idx)=>idx!==i));
 
-  // 항목 삭제
-  const deleteItem = (item) => setBudgetItems(prev => prev.filter(i=>i!==item));
-
-  // 2단 배치
-  const half = Math.ceil(budgetItems.length/2);
-  const left = budgetItems.slice(0, half);
-  const right = budgetItems.slice(half);
-
-  const totalBudget = budgetItems.reduce((acc,b)=>acc+Number(b.cost||0),0);
+  const total = budgetItems.reduce((sum,it)=>sum+it.cost,0);
 
   return (
     <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-      {/* 입력창 */}
       <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
-        <input
-          placeholder="항목명"
-          value={budgetName}
-          onChange={e=>setBudgetName(e.target.value)}
-          style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}
-        />
-        <input
-          placeholder="금액"
-          type="number"
-          value={budgetCost}
-          onChange={e=>setBudgetCost(e.target.value)}
-          style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"100px"}}
-        />
-        <button
-          onClick={addItem}
-          style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}
-        >
-          ➕ 추가
-        </button>
+        <input placeholder="항목" value={itemText} onChange={e=>setItemText(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}/>
+        <input placeholder="금액" value={itemCost} onChange={e=>setItemCost(e.target.value)} style={{padding:"8px",borderRadius:"10px",border:"1px solid #ddd"}}/>
+        <button onClick={addItem} style={{padding:"8px 15px",borderRadius:"12px",background:"#ff8fa3",color:"#fff",border:"none",cursor:"pointer"}}>➕ 추가</button>
       </div>
-
-      {/* 총액 */}
-      <div style={{marginBottom:"10px", fontWeight:"bold"}}>
-        총 예산: {totalBudget.toLocaleString()}원
+      <div style={{display:"flex", flexDirection:"column", gap:"5px"}}>
+        {budgetItems.map((b,i)=><div key={i} style={{display:"flex", justifyContent:"space-between", padding:"8px", borderRadius:"10px", background:"#f9f9f9"}}>{b.name} - {b.cost.toLocaleString()}원 <button onClick={()=>deleteItem(i)} style={{border:"none", background:"#ff8fa3", color:"#fff", borderRadius:"6px", cursor:"pointer"}}>❌</button></div>)}
       </div>
-
-      {/* 2단 리스트 */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
-        {[left,right].map((col,idx)=>(
-          <div key={idx}>
-            {col.map((b,i)=>(
-              <div key={i} style={{
-                display:"flex", justifyContent:"space-between", alignItems:"center",
-                padding:"8px", margin:"5px 0", borderRadius:"12px", background:"#f9f9f9",
-                boxShadow:"0 1px 3px rgba(0,0,0,0.1)"
-              }}>
-                {/* 왼쪽: 항목명 */}
-                <span style={{flex:1}}>{b.name}</span>
-
-                {/* 오른쪽: 금액 + 삭제 */}
-                <div style={{display:"flex", gap:"5px", alignItems:"center"}}>
-                  <span>{Number(b.cost).toLocaleString()}원</span>
-                  <button onClick={()=>deleteItem(b)} style={{
-                    padding:"2px 6px", borderRadius:"6px", background:"#ffb3c1",
-                    border:"none", cursor:"pointer"
-                  }}>❌</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      <div style={{marginTop:"10px", fontWeight:"bold"}}>총 합계: {total.toLocaleString()}원</div>
     </div>
   );
 }
