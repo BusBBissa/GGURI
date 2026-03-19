@@ -401,6 +401,7 @@ function GuestsTab({ coupleId }) {
     </div>
   );
 }
+
 // ---------------- BudgetTab ----------------
 function BudgetTab({ coupleId }) {
   const [budgetItems, setBudgetItems] = useState([]);
