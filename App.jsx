@@ -18,9 +18,10 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [coupleId, setCoupleId] = useState("");
   const [inputCoupleId, setInputCoupleId] = useState("");
+
   const [tab, setTab] = useState("home");
 
-  // 사진
+  // 사진 슬라이드
   const [images, setImages] = useState([]);
   const [currentImage, setCurrentImage] = useState(0);
 
@@ -50,9 +51,8 @@ export default function App() {
   const [guestName, setGuestName] = useState("");
   const [guestSearch, setGuestSearch] = useState("");
 
-  // Auth 상태
   useEffect(() => {
-    onAuthStateChanged(auth, (u) => setUser(u || null));
+    onAuthStateChanged(auth, (u) => u && setUser(u));
   }, []);
 
   // Firestore load
@@ -86,11 +86,9 @@ export default function App() {
     return () => clearInterval(interval);
   }, [images]);
 
-  // 로그인/로그아웃
   const login = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
-  // 커플 생성/입장
   const createCouple = () => {
     const id = Math.random().toString(36).slice(2, 8);
     setCoupleId(id);
@@ -99,7 +97,6 @@ export default function App() {
   };
   const joinCouple = () => setCoupleId(inputCoupleId);
 
-  // 달력 계산
   const baseDate = new Date();
   baseDate.setMonth(baseDate.getMonth() + monthOffset);
   const year = baseDate.getFullYear();
@@ -108,95 +105,100 @@ export default function App() {
   const dday = weddingDate ? Math.ceil((new Date(weddingDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
   const totalBudget = budgetItems.reduce((a, b) => a + b.cost, 0);
 
-  // 사용자 로그인 전
-  if (!user) {
-    return (
-      <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#fce3ec,#ffe8d6)" }}>
-        <div style={{ textAlign: "center" }}>
-          <h1 style={{ fontSize: "40px", marginBottom: "20px" }}>💍 Wedding</h1>
-          <button onClick={login} style={{ padding: "15px 40px", fontSize: "18px", borderRadius: "20px", border: "none", background: "#ff6f91", color: "#fff", cursor: "pointer" }}>
-            Google 로그인
-          </button>
+  if (!user) return (
+    <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"linear-gradient(135deg,#fce3ec,#ffe8d6)" }}>
+      <div style={{ textAlign:"center" }}>
+        <h1 style={{ fontSize:"40px", marginBottom:"20px" }}>💍 Wedding</h1>
+        <button onClick={login} style={{ padding:"15px 40px", fontSize:"18px", borderRadius:"20px", border:"none", background:"#ff6f91", color:"#fff", cursor:"pointer" }}>Google 로그인</button>
+      </div>
+    </div>
+  );
+
+  if (!coupleId) return (
+    <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"#fff0f5" }}>
+      <div style={{ textAlign:"center", background:"#fff", padding:"30px", borderRadius:"20px", boxShadow:"0 5px 20px rgba(0,0,0,0.1)" }}>
+        <button onClick={createCouple} style={{ padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", marginBottom:"10px" }}>커플 생성</button>
+        <div style={{ marginTop:"10px" }}>
+          <input placeholder="초대 코드 입력" value={inputCoupleId} onChange={(e)=>setInputCoupleId(e.target.value)} style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px" }} />
+          <button onClick={joinCouple} style={{ padding:"8px 15px", borderRadius:"12px", background:"#ffb3c1", border:"none" }}>입장</button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // 커플 코드 입력 전
-  if (!coupleId) {
-    return (
-      <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#fff0f5" }}>
-        <div style={{ textAlign: "center", background: "#fff", padding: "30px", borderRadius: "20px", boxShadow: "0 5px 20px rgba(0,0,0,0.1)" }}>
-          <button onClick={createCouple} style={{ padding: "10px 20px", borderRadius: "12px", background: "#ff8fa3", color: "#fff", border: "none", marginBottom: "10px" }}>커플 생성</button>
-          <div style={{ marginTop: "10px" }}>
-            <input placeholder="초대 코드 입력" value={inputCoupleId} onChange={(e) => setInputCoupleId(e.target.value)} style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", marginRight: "5px" }} />
-            <button onClick={joinCouple} style={{ padding: "8px 15px", borderRadius: "12px", background: "#ffb3c1", border: "none" }}>입장</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 사용자 로그인 + 커플 코드 입력 완료 후 UI
   return (
-    <div style={{ minHeight: "100vh", background: "#fff5f7", padding: "20px", fontFamily: "'Arial',sans-serif" }}>
+    <div style={{ minHeight:"100vh", background:"#fff5f7", padding:"20px", fontFamily:"'Arial',sans-serif" }}>
+
       {/* 탭 */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-        {["home", "tasks", "guests", "budget"].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "12px", borderRadius: "20px", border: "none", background: tab === t ? "#ff8fa3" : "white", color: tab === t ? "white" : "black", fontWeight: "bold" }}>
-            {t === "home" ? "홈" : t === "tasks" ? "할일" : t === "guests" ? "하객" : "예산"}
-          </button>
+      <div style={{ display:"flex", gap:"10px", marginBottom:"20px" }}>
+        {["home","tasks","guests","budget"].map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{ flex:1, padding:"12px", borderRadius:"20px", border:"none", background: tab===t?"#ff8fa3":"white", color: tab===t?"white":"black", fontWeight:"bold" }}>{t==="home"?"홈":t==="tasks"?"할일":t==="guests"?"하객":"예산"}</button>
         ))}
-        <button onClick={logout} style={{ marginLeft: "10px", padding: "8px 12px", borderRadius: "12px", background: "#ffb3c1", border: "none" }}>로그아웃</button>
+        <button onClick={logout} style={{ marginLeft:"10px", padding:"8px 12px", borderRadius:"12px", background:"#ffb3c1", border:"none" }}>로그아웃</button>
       </div>
 
-      {/* 탭별 UI 시작 */}
-      {tab === "home" && (
+      {/* 홈 탭 */}
+      {tab==="home" && (
         <div>
-          {/* 사진 슬라이드 + 썸네일 */}
-          <div style={{ position: "relative", borderRadius: "20px", overflow: "hidden", marginBottom: "20px" }}>
-            {images.length > 0 && <img src={images[currentImage]} style={{ width: "100%", maxHeight: "300px", objectFit: "cover" }} />}
-            <div style={{ display: "flex", justifyContent: "center", gap: "5px", position: "absolute", bottom: "10px", width: "100%" }}>
+          {/* 사진 슬라이드 */}
+          <div style={{ position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px" }}>
+            {images.length>0 && <img src={images[currentImage]} style={{ width:"100%", maxHeight:"300px", objectFit:"cover" }} />}
+            {/* 썸네일 */}
+            <div style={{ display:"flex", justifyContent:"center", gap:"5px", position:"absolute", bottom:"10px", width:"100%" }}>
               {images.map((img, idx) => (
-                <img key={idx} src={img} onClick={() => setCurrentImage(idx)} style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "8px", border: idx === currentImage ? "2px solid #ff8fa3" : "1px solid #ccc", cursor: "pointer" }} />
+                <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{ width:"40px", height:"40px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer" }} />
               ))}
             </div>
-            <label style={{ position: "absolute", top: "10px", right: "10px", background: "#ff8fa3", color: "#fff", padding: "10px 20px", borderRadius: "12px", cursor: "pointer", fontWeight: "bold", boxShadow: "0 4px 10px rgba(0,0,0,0.2)" }}>
-              사진 추가
-              <input type="file" style={{ display: "none" }} onChange={e => {
-                const file = e.target.files[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = () => setImages([...images, reader.result]);
-                  reader.readAsDataURL(file);
-                }
-              }} />
-            </label>
+            {/* 눈에 보이는 업로드 버튼 */}
+            <button onClick={()=>document.getElementById("photoUploadInput").click()} style={{ position:"absolute", top:"10px", right:"10px", background:"#ff8fa3", color:"#fff", border:"none", padding:"10px 20px", borderRadius:"12px", cursor:"pointer", fontWeight:"bold", boxShadow:"0 4px 10px rgba(0,0,0,0.2)" }}>사진 추가</button>
+            <input type="file" id="photoUploadInput" style={{ display:"none" }} onChange={(e)=>{
+              const file = e.target.files[0];
+              if(file){
+                const reader = new FileReader();
+                reader.onload=()=>setImages([...images, reader.result]);
+                reader.readAsDataURL(file);
+              }
+            }} />
           </div>
 
           {/* D-day */}
-          <div style={{ background: "white", padding: "20px", borderRadius: "20px", textAlign: "center", marginBottom: "20px", boxShadow: "0 5px 15px rgba(0,0,0,0.05)" }}>
+          <div style={{ background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px" }}>
             <h2>D-{dday ?? "?"}</h2>
-            <input type="date" value={weddingDate} onChange={e => setWeddingDate(e.target.value)} style={{ padding: "10px", borderRadius: "12px", border: "1px solid #ddd", marginTop: "10px" }} />
+            <input type="date" value={weddingDate} onChange={(e)=>setWeddingDate(e.target.value)} style={{ padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px" }} />
+          </div>
+
+          {/* 달력 */}
+          <div style={{ background:"white", padding:"20px", borderRadius:"20px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"10px" }}>
+              <button onClick={()=>setMonthOffset(monthOffset-1)} style={{ padding:"5px 12px", borderRadius:"10px", border:"none", background:"#ffccd5", color:"#fff" }}>◀ 이전달</button>
+              <h3>{year}년 {month+1}월</h3>
+              <button onClick={()=>setMonthOffset(monthOffset+1)} style={{ padding:"5px 12px", borderRadius:"10px", border:"none", background:"#ff8fa3", color:"#fff" }}>다음달 ▶</button>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px" }}>
+              {[...Array(daysInMonth)].map((_, i)=>{
+                const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+                const hasEvent = events.find(e=>e.date===date);
+                return (<div key={i} onClick={()=>setSelectedDate(date)} style={{ padding:"12px", borderRadius:"10px", background:hasEvent?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer" }}>{i+1}</div>);
+              })}
+            </div>
+            {selectedDate && (
+              <div style={{ marginTop:"10px" }}>
+                <h4>{selectedDate}</h4>
+                {events.filter(e=>e.date===selectedDate).map((e,i)=>(<div key={i}>{e.text}</div>))}
+                <input placeholder="일정" value={eventText} onChange={(e)=>setEventText(e.target.value)} style={{ padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px" }} />
+                <button onClick={()=>{ setEvents([...events, { text:eventText, date:selectedDate }]); setEventText(""); }} style={{ padding:"5px 10px", borderRadius:"10px", border:"none", background:"#ff8fa3", color:"#fff" }}>추가</button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {tab === "tasks" && (
-        <div> {/* 할일 UI 여기에 */} </div>
-      )}
-
-      {tab === "guests" && (
-        <div> {/* 하객 UI 여기에 */} </div>
-      )}
-
-      {tab === "budget" && (
-        <div> {/* 예산 UI 여기에 */} </div>
-      )}
+      {/* 탭별 나머지 UI 생략 (할일/하객/예산) */}
 
       {/* 우측 하단 초대코드 버튼 */}
-      <button onClick={() => { navigator.clipboard.writeText(coupleId); alert("초대 코드 복사됨: " + coupleId); }}
-        style={{ position: "fixed", bottom: "20px", right: "20px", background: "#ff8fa3", color: "#fff", border: "none", padding: "16px", borderRadius: "50%", fontSize: "20px", cursor: "pointer" }}>+</button>
+      <button onClick={()=>{ navigator.clipboard.writeText(coupleId); alert("초대 코드 복사됨: "+coupleId); }}
+        style={{ position:"fixed", bottom:"20px", right:"20px", background:"#ff8fa3", color:"#fff", border:"none", padding:"16px", borderRadius:"50%", fontSize:"20px", cursor:"pointer" }}>+</button>
+
     </div>
   );
 }
