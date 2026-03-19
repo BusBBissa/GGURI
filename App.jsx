@@ -117,7 +117,6 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh", background:"#fff5f7", padding:"20px", fontFamily:"'Arial', sans-serif"}}>
-
       {/* 탭 */}
       <div style={{display:"flex", gap:"10px", marginBottom:"20px"}}>
         {["home","tasks","guests","budget"].map(t => (
@@ -131,37 +130,23 @@ export default function App() {
       {/* 홈 */}
       {tab==="home" && (
         <div>
-          {/* 사진 슬라이드 */}
+          {/* 사진 슬라이드 + 업로드 */}
           <div style={{position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px"}}>
-            {images.length>0 && <img src={images[currentImage]} style={{width:"100%", maxHeight:"300px", objectFit:"cover"}} />}
-            
-            {/* 썸네일 */}
-            <div style={{display:"flex", justifyContent:"center", gap:"5px", position:"absolute", bottom:"10px", width:"100%"}}>
+            {images.length>0 && <img src={images[currentImage]} style={{width:"100%", maxHeight:"300px", objectFit:"contain"}} />}
+            <div style={{display:"flex", justifyContent:"center", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
               {images.map((img,idx)=>(
-                <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{width:"40px", height:"40px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
+                <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{width:"60px", height:"60px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
               ))}
             </div>
-          </div>
-
-          {/* 사진 업로드 버튼 */}
-          <div style={{textAlign:"center", marginBottom:"20px"}}>
-            <input
-              type="file"
-              id="upload-image"
-              style={{display:"none"}}
-              onChange={e => {
+            <label style={{position:"absolute", top:"10px", right:"10px", background:"#fff", padding:"5px 10px", borderRadius:"10px", cursor:"pointer"}}>
+              사진 추가
+              <input type="file" style={{display:"none"}} onChange={e=>{
                 const file = e.target.files[0];
-                if(!file) return;
+                if (!file) return;
                 const reader = new FileReader();
-                reader.onload = () => setImages([...images, reader.result]);
+                reader.onload = ()=>setImages([...images, reader.result]);
                 reader.readAsDataURL(file);
-              }}
-            />
-            <label
-              htmlFor="upload-image"
-              style={{padding:"12px 25px", background:"#ff8fa3", color:"#fff", borderRadius:"20px", cursor:"pointer", fontWeight:"bold", boxShadow:"0 4px 10px rgba(0,0,0,0.2)"}}
-            >
-              사진 업로드
+              }}/>
             </label>
           </div>
 
@@ -197,7 +182,64 @@ export default function App() {
         </div>
       )}
 
-      {/* 이하 할일, 하객, 예산 탭은 기존 5번 코드 동일 */}
+      {/* 할일 */}
+      {tab==="tasks" && (
+        <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
+          <select value={category} onChange={e=>setCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", marginRight:"5px"}}>
+            <option>스드메</option><option>웨딩홀</option><option>신혼여행</option><option>예물</option><option>혼수</option>
+          </select>
+          <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"60%", marginRight:"5px"}}/>
+          <button onClick={()=>{setTasks([...tasks,{text:taskText,category,done:false}]); setTaskText("")}} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+
+          <div style={{marginTop:"10px"}}>
+            {Object.entries(tasks.reduce((acc,t)=>{acc[t.category]=acc[t.category]||[]; acc[t.category].push(t); return acc;},{})).map(([cat,list])=>(
+              <div key={cat} style={{marginBottom:"10px"}}>
+                <b>{cat}</b>
+                {list.map((t,i)=>(
+                  <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0"}}>
+                    <span style={{textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
+                    <div>
+                      <button onClick={()=>{let x=[...tasks]; x[tasks.indexOf(t)].done=!x[tasks.indexOf(t)].done; setTasks(x)}}>{t.done?"완료":"미완료"}</button>
+                      <button onClick={()=>setTasks(tasks.filter(task=>task!==t))}>삭제</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 하객 */}
+      {tab==="guests" && (
+        <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
+          <div style={{display:"flex", gap:"10px", marginBottom:"10px"}}>
+            {["신랑","신부"].map(p=>(
+              <button key={p} onClick={()=>setGuestParent(p)} style={{flex:1, padding:"8px", borderRadius:"12px", border:"none", background:guestParent===p?"#ff8fa3":"#eee", color:guestParent===p?"white":"black"}}>{p}</button>
+            ))}
+          </div>
+          <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"5px", borderRadius:"8px", marginRight:"5px"}}/>
+          <input placeholder="이름" value={guestName} onChange={e=>setGuestName(e.target.value)} style={{padding:"5px", borderRadius:"8px", marginRight:"5px"}}/>
+          <button onClick={()=>{setGuests([...guests,{parent:guestParent,category:guestCategory,name:guestName}]); setGuestCategory(""); setGuestName("")}} style={{padding:"6px 12px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+          <input placeholder="검색" value={guestSearch} onChange={e=>setGuestSearch(e.target.value)} style={{marginTop:"10px", padding:"5px", borderRadius:"8px", width:"100%"}}/>
+          <div style={{marginTop:"10px", maxHeight:"250px", overflowY:"auto"}}>
+            {guests.filter(g=>g.name.includes(guestSearch)||g.category.includes(guestSearch)).map((g,i)=>(
+              <div key={i} style={{padding:"5px", borderBottom:"1px solid #eee"}}><b>{g.parent} > {g.category}</b> : {g.name}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 예산 */}
+      {tab==="budget" && (
+        <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
+          <h3>💰 예산: {totalBudget}원</h3>
+          <input placeholder="항목" value={budgetName} onChange={e=>setBudgetName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+          <input placeholder="금액" type="number" value={budgetCost} onChange={e=>setBudgetCost(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+          <button onClick={()=>{setBudgetItems([...budgetItems,{name:budgetName,cost:+budgetCost}]); setBudgetName(""); setBudgetCost("")}} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+          <div style={{marginTop:"10px"}}>{budgetItems.map((b,i)=><div key={i}>{b.name} - {b.cost}원</div>)}</div>
+        </div>
+      )}
 
       {/* 우측 하단 초대코드 + 버튼 */}
       <button onClick={()=>{navigator.clipboard.writeText(coupleId); alert("초대 코드 복사됨: "+coupleId)}} style={{position:"fixed", bottom:"20px", right:"20px", background:"#ff8fa3", color:"#fff", border:"none", padding:"16px", borderRadius:"50%", fontSize:"20px", cursor:"pointer"}}>+</button>
