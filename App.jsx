@@ -18,8 +18,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [coupleId, setCoupleId] = useState("");
   const [inputCoupleId, setInputCoupleId] = useState("");
-
   const [tab, setTab] = useState("home");
+
   const [images, setImages] = useState([]);
   const [currentImage, setCurrentImage] = useState(0);
 
@@ -32,7 +32,7 @@ export default function App() {
 
   const [tasks, setTasks] = useState([]);
   const [taskText, setTaskText] = useState("");
-  const [category, setCategory] = useState("");
+  const [taskCategory, setTaskCategory] = useState("");
 
   const [budgetItems, setBudgetItems] = useState([]);
   const [budgetName, setBudgetName] = useState("");
@@ -116,6 +116,35 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh", background:"#fff5f7", padding:"20px", fontFamily:"'Arial', sans-serif"}}>
+      {/* 사진 업로드 */}
+      <div style={{marginBottom:"20px"}}>
+        <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
+          사진 추가
+          <input type="file" style={{display:"none"}} onChange={e=>{
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = ()=>setImages([...images, reader.result]);
+            reader.readAsDataURL(file);
+          }}/>
+        </label>
+        <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
+          {images.map((img, idx)=>(
+            <div key={idx} style={{position:"relative"}}>
+              <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
+              <button onClick={()=>setImages(images.filter((_,i)=>i!==idx))} style={{position:"absolute", top:"-5px", right:"-5px", background:"red", color:"#fff", border:"none", borderRadius:"50%", width:"20px", height:"20px", cursor:"pointer"}}>x</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 사진 슬라이드 */}
+      {images.length>0 && (
+        <div style={{position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px", height:"50vh"}}>
+          <img src={images[currentImage]} style={{width:"100%", height:"100%", objectFit:"contain"}} />
+        </div>
+      )}
+
       {/* 탭 */}
       <div style={{display:"flex", gap:"10px", marginBottom:"20px"}}>
         {["home","tasks","guests","budget"].map(t => (
@@ -129,36 +158,7 @@ export default function App() {
       {/* 홈 */}
       {tab==="home" && (
         <div>
-          {/* 사진 업로드 버튼 + 미리보기 */}
-          <div style={{marginBottom:"20px"}}>
-            <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
-              사진 추가
-              <input type="file" style={{display:"none"}} onChange={e=>{
-                const file = e.target.files[0];
-                if(!file) return;
-                const reader = new FileReader();
-                reader.onload = ()=>setImages([...images, reader.result]);
-                reader.readAsDataURL(file);
-              }}/>
-            </label>
-            <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
-              {images.map((img, idx)=>(
-                <div key={idx} style={{position:"relative"}}>
-                  <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
-                  <button onClick={()=>setImages(images.filter((_,i)=>i!==idx))} style={{position:"absolute", top:0, right:0, background:"#ff8fa3", color:"#fff", border:"none", borderRadius:"50%", width:"20px", height:"20px", cursor:"pointer"}}>x</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 사진 슬라이드 */}
-          {images.length>0 && (
-            <div style={{position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px", maxHeight:"50vh"}}>
-              <img src={images[currentImage]} style={{width:"100%", height:"100%", objectFit:"contain"}} />
-            </div>
-          )}
-
-          {/* D-day */}
+          <h2>우리의 웨딩</h2>
           <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
             <h2>D-{dday ?? "?"}</h2>
             <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
@@ -168,12 +168,13 @@ export default function App() {
 
       {/* 할일 */}
       {tab==="tasks" && (
-        <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-          <input placeholder="카테고리" value={category} onChange={e=>setCategory(e.target.value)} style={{padding:"5px", borderRadius:"8px", marginRight:"5px"}}/>
-          <input placeholder="내용" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"5px", borderRadius:"8px", marginRight:"5px"}}/>
-          <button onClick={()=>{setTasks([...tasks,{category, text:taskText, done:false}]); setCategory(""); setTaskText("")}} style={{padding:"6px 12px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+        <div style={{background:"white", padding:"15px", borderRadius:"20px", marginBottom:"20px"}}>
+          <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+          <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"60%", marginRight:"5px"}}/>
+          <button onClick={()=>{setTasks([...tasks,{text:taskText,category:taskCategory,done:false}]); setTaskText(""); setTaskCategory("")}} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+
           <div style={{marginTop:"10px"}}>
-            {Object.entries(tasks.reduce((acc,t)=>{acc[t.category]=acc[t.category]||[]; acc[t.category].push(t); return acc;}, {})).map(([cat,list])=>(
+            {Object.entries(tasks.reduce((acc,t)=>{acc[t.category]=acc[t.category]||[]; acc[t.category].push(t); return acc;},{})).map(([cat,list])=>(
               <div key={cat} style={{marginBottom:"10px"}}>
                 <b>{cat}</b>
                 {list.map((t,i)=>(
@@ -224,6 +225,7 @@ export default function App() {
 
       {/* 우측 하단 초대코드 + 버튼 */}
       <button onClick={()=>{navigator.clipboard.writeText(coupleId); alert("초대 코드 복사됨: "+coupleId)}} style={{position:"fixed", bottom:"20px", right:"20px", background:"#ff8fa3", color:"#fff", border:"none", padding:"16px", borderRadius:"50%", fontSize:"20px", cursor:"pointer"}}>+</button>
+
     </div>
   );
 }
