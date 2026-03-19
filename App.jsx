@@ -128,18 +128,20 @@ function HomeTab({ coupleId }) {
 
   // ---------------- 초기 데이터 불러오기 ----------------
   useEffect(() => {
-    // 1. localStorage에서 사진 불러오기
     const savedImages = localStorage.getItem(storageKey);
     if (savedImages) setImages(JSON.parse(savedImages));
 
-    // 2. Firestore에서 D-day와 이벤트 불러오기
     const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
-      if (snap.exists()) {
-        const data = snap.data();
-        setEvents(data.events || []);
-        setWeddingDate(data.weddingDate || "");
-        setImages(data.images || []);
+      try {
+        const snap = await getDoc(doc(db, "couples", coupleId));
+        if (snap.exists()) {
+          const data = snap.data();
+          setEvents(data.events || []);
+          setWeddingDate(data.weddingDate || "");
+          if (data.images) setImages(data.images);
+        }
+      } catch (err) {
+        console.error("Firestore load error:", err);
       }
     };
     load();
@@ -148,29 +150,31 @@ function HomeTab({ coupleId }) {
   // ---------------- 사진 localStorage 저장 ----------------
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(images));
-  }, [images]);
+    // Firestore에도 저장 가능
+    updateDoc(doc(db, "couples", coupleId), { images }).catch(console.error);
+  }, [images, coupleId]);
 
-  // ---------------- Firestore 저장 ----------------
-  const saveField = async (field, value) => {
-    await updateDoc(doc(db, "couples", coupleId), { [field]: value });
-  };
+  // ---------------- Firestore D-day / 이벤트 저장 ----------------
+  useEffect(() => {
+    updateDoc(doc(db, "couples", coupleId), { weddingDate }).catch(console.error);
+  }, [weddingDate, coupleId]);
 
-  useEffect(() => { if (events.length) saveField("events", events); }, [events]);
-  useEffect(() => { if (weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
-  useEffect(() => { if (images.length) saveField("images", images); }, [images]);
+  useEffect(() => {
+    updateDoc(doc(db, "couples", coupleId), { events }).catch(console.error);
+  }, [events, coupleId]);
 
   // ---------------- 사진 슬라이드 ----------------
   useEffect(() => {
     if (images.length < 2) return;
-    const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
+    const interval = setInterval(() => setCurrentImage(prev => (prev + 1) % images.length), 3000);
     return () => clearInterval(interval);
   }, [images]);
 
   // ---------------- 사진 업로드 ----------------
   const uploadImage = (file) => {
-    const img = new Image();
     const reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = (e) => {
+      const img = new Image();
       img.src = e.target.result;
       img.onload = () => {
         const canvas = document.createElement("canvas");
@@ -183,12 +187,11 @@ function HomeTab({ coupleId }) {
         setImages(prev => [...prev, resizedDataUrl]);
       };
     };
+    reader.onerror = (err) => console.error("FileReader error:", err);
     reader.readAsDataURL(file);
   };
 
-  const deleteImage = (idx) => {
-    setImages(prev => prev.filter((_, i) => i !== idx));
-  };
+  const deleteImage = (idx) => setImages(prev => prev.filter((_, i) => i !== idx));
 
   // ---------------- 달력 계산 ----------------
   const today = new Date();
@@ -205,10 +208,10 @@ function HomeTab({ coupleId }) {
       <div style={{marginBottom:"20px"}}>
         <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
           사진 추가
-          <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ if(e.target.files[0]) uploadImage(e.target.files[0]); }} />
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={e => { if(e.target.files[0]) uploadImage(e.target.files[0]); }} />
         </label>
         <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
-          {images.map((img, idx)=>(
+          {images.map((img, idx) => (
             <div key={idx} style={{position:"relative"}}>
               <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
               <button onClick={()=>deleteImage(idx)} style={{position:"absolute", top:"-5px", right:"-5px", background:"red", color:"white", borderRadius:"50%", width:"20px", height:"20px", border:"none", cursor:"pointer"}}>×</button>
@@ -227,7 +230,7 @@ function HomeTab({ coupleId }) {
       {/* D-day */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
         <h2>D-{weddingDate ? Math.floor((new Date(weddingDate)-new Date())/(1000*60*60*24)) : "?"}</h2>
-        <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
+        <input type="date" value={weddingDate} onChange={e => setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
       </div>
 
       {/* 달력 */}
@@ -239,9 +242,7 @@ function HomeTab({ coupleId }) {
         </div>
 
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:"5px", textAlign:"center", fontWeight:"bold"}}>
-          {weekdays.map((d,i)=>(
-            <div key={i} style={{padding:"5px", color: i===0?"red":i===6?"blue":"black"}}>{d}</div>
-          ))}
+          {weekdays.map((d,i)=><div key={i} style={{padding:"5px", color:i===0?"red":i===6?"blue":"black"}}>{d}</div>)}
         </div>
 
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
@@ -281,7 +282,6 @@ function HomeTab({ coupleId }) {
     </div>
   );
 }
-//////////////////////////
 // ---------------- TasksTab ----------------
 function TasksTab({ coupleId }) {
   const [tasks, setTasks] = useState([]);
