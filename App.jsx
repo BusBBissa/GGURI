@@ -93,6 +93,7 @@ function TabBar({ tab, setTab, logout }) {
 }
 
 // ---------------- HomeTab ----------------
+
 function HomeTab({ coupleId }) {
   const [images, setImages] = useState([]);
   const [currentImage, setCurrentImage] = useState(0);
@@ -247,7 +248,6 @@ function HomeTab({ coupleId }) {
     </div>
   );
 }
-
 // ---------------- TasksTab ----------------
 function TasksTab({ coupleId }) {
   const [tasks, setTasks] = useState([]);
