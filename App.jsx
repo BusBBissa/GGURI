@@ -101,42 +101,45 @@ function HomeTab({ coupleId }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
 
-  const storageKey = `wedding_images_${coupleId}`;
+  const storageKeyImages = `wedding_images_${coupleId}`;
+  const storageKeyHome = `wedding_home_${coupleId}`;
 
-  // ---------------- 초기 데이터 불러오기 ----------------
+  // ---------------- 초기 데이터 로드 ----------------
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) setImages(JSON.parse(saved));
+    // 1. LocalStorage에서 사진 불러오기
+    const savedImages = localStorage.getItem(storageKeyImages);
+    if (savedImages) setImages(JSON.parse(savedImages));
 
-    const load = async () => {
-      const refDoc = doc(db, "couples", coupleId);
-      const snap = await getDoc(refDoc);
-      if (snap.exists()) {
-        const data = snap.data();
-        setEvents(data.events || []);
-        setWeddingDate(data.weddingDate || "");
+    // 2. Firestore + LocalStorage에서 D-day/이벤트 불러오기
+    const loadHome = async () => {
+      const snap = await getDoc(doc(db, "couples", coupleId));
+      let d = {};
+      if (snap.exists()) d = snap.data();
+      const savedHome = localStorage.getItem(storageKeyHome);
+      if (savedHome) {
+        const parsed = JSON.parse(savedHome);
+        setWeddingDate(parsed.weddingDate || d.weddingDate || "");
+        setEvents(parsed.events || d.events || []);
       } else {
-        // 문서 없으면 생성
-        await setDoc(refDoc, { events: [], weddingDate: "" });
+        setWeddingDate(d.weddingDate || "");
+        setEvents(d.events || []);
       }
     };
-    load();
+    loadHome();
   }, [coupleId]);
 
-  // ---------------- LocalStorage 저장 ----------------
+  // ---------------- 상태 저장 ----------------
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(images));
+    localStorage.setItem(storageKeyImages, JSON.stringify(images));
   }, [images]);
 
-  // ---------------- Firestore 저장 ----------------
-  const saveField = async (field, value) => {
-    const refDoc = doc(db, "couples", coupleId);
-    await setDoc(refDoc, { [field]: value }, { merge: true });
-  };
-
-  // weddingDate와 events 변경 시 Firestore 저장
-  useEffect(() => { saveField("weddingDate", weddingDate); }, [weddingDate]);
-  useEffect(() => { saveField("events", events); }, [events]);
+  useEffect(() => {
+    const saveHome = async () => {
+      localStorage.setItem(storageKeyHome, JSON.stringify({ weddingDate, events }));
+      await updateDoc(doc(db, "couples", coupleId), { weddingDate, events });
+    };
+    saveHome();
+  }, [weddingDate, events, coupleId]);
 
   // ---------------- 사진 슬라이드 ----------------
   useEffect(() => {
@@ -145,14 +148,14 @@ function HomeTab({ coupleId }) {
     return () => clearInterval(interval);
   }, [images]);
 
-  // ---------------- 사진 업로드 ----------------
   const uploadImage = (file) => {
+    const img = new Image();
     const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.src = reader.result;
+    reader.onload = e => {
+      img.src = e.target.result;
       img.onload = () => {
-        const scale = Math.min(1, 800 / img.width);
+        const maxWidth = 800;
+        const scale = Math.min(1, maxWidth / img.width);
         const canvas = document.createElement("canvas");
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
@@ -220,9 +223,7 @@ function HomeTab({ coupleId }) {
 
         {/* 날짜 */}
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
-          {Array(firstDayOfMonth).fill(null).map((_,i)=>(
-            <div key={"blank"+i}></div>
-          ))}
+          {Array(firstDayOfMonth).fill(null).map((_,i)=><div key={"blank"+i}></div>)}
           {Array(daysInMonth).fill(null).map((_,i)=>{
             const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
             const hasEvent = events.find(e=>e.date===date);
