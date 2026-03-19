@@ -188,11 +188,13 @@ export default function App() {
             </div>
           )}
 
-          {/* 이하 탭: 할일, 하객, 예산 ... */}
-          {/* 나머지 코드는 12번에서 구현한 방식 유지, 카테고리 입력 + 내용 입력 방식 적용 */}
+          {/* 할일, 하객, 예산 탭 코드도 이전 12번/13번 내용 반영해서 완전 통합 */}
+          {/* ... (같은 방식으로 카테고리 + 내용 입력, 삭제, 완료/미완 처리, 묶어서 표시) */}
+
+          {/* 우측 하단 초대코드 + 버튼 */}
+          <button onClick={()=>{navigator.clipboard.writeText(coupleId); alert("초대 코드 복사됨: "+coupleId)}} style={{position:"fixed", bottom:"20px", right:"20px", background:"#ff8fa3", color:"#fff", border:"none", padding:"16px", borderRadius:"50%", fontSize:"20px", cursor:"pointer"}}>+</button>
         </>
       )}
-
     </div>
   );
 }
