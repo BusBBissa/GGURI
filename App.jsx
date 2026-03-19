@@ -18,7 +18,6 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [coupleId, setCoupleId] = useState("");
   const [inputCoupleId, setInputCoupleId] = useState("");
-
   const [tab, setTab] = useState("home");
 
   const [images, setImages] = useState([]);
@@ -130,25 +129,31 @@ export default function App() {
       {/* 홈 */}
       {tab==="home" && (
         <div>
-          {/* 사진 슬라이드 + 업로드 */}
-          <div style={{position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px"}}>
-            {images.length>0 && <img src={images[currentImage]} style={{width:"100%", maxHeight:"300px", objectFit:"contain"}} />}
-            <div style={{display:"flex", justifyContent:"center", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
-              {images.map((img,idx)=>(
-                <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{width:"60px", height:"60px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
-              ))}
-            </div>
-            <label style={{position:"absolute", top:"10px", right:"10px", background:"#fff", padding:"5px 10px", borderRadius:"10px", cursor:"pointer"}}>
+          {/* 사진 업로드 버튼 + 미리보기 */}
+          <div style={{marginBottom:"20px"}}>
+            <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
               사진 추가
               <input type="file" style={{display:"none"}} onChange={e=>{
                 const file = e.target.files[0];
-                if (!file) return;
+                if(!file) return;
                 const reader = new FileReader();
                 reader.onload = ()=>setImages([...images, reader.result]);
                 reader.readAsDataURL(file);
               }}/>
             </label>
+            <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
+              {images.map((img, idx)=>(
+                <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
+              ))}
+            </div>
           </div>
+
+          {/* 사진 슬라이드 */}
+          {images.length>0 && (
+            <div style={{position:"relative", borderRadius:"20px", overflow:"hidden", marginBottom:"20px"}}>
+              <img src={images[currentImage]} style={{width:"100%", maxHeight:"300px", objectFit:"contain"}} />
+            </div>
+          )}
 
           {/* D-day */}
           <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
@@ -174,7 +179,7 @@ export default function App() {
               <div style={{marginTop:"10px"}}>
                 <h4>{selectedDate}</h4>
                 {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
-                <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+                <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px'}}/>
                 <button onClick={()=>{setEvents([...events,{text:eventText,date:selectedDate}]); setEventText("")}} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
               </div>
             )}
