@@ -134,13 +134,19 @@ function HomeTab({ coupleId }) {
   const dday = weddingDate ? Math.ceil((new Date(weddingDate) - new Date()) / (1000*60*60*24)) : null;
 
   const uploadImage = async (file) => {
-    try {
-      const storageRef = ref(storage, `images/${coupleId}/${file.name}-${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      setImages(prev => [...prev, url]);
-    } catch(err) { console.error(err); alert("사진 업로드 실패"); }
-  };
+  console.log("업로드 시도", coupleId, file);
+  try {
+    if (!coupleId) throw new Error("coupleId가 없습니다!"); // coupleId 확인
+    const storageRef = ref(storage, `images/${coupleId}/${file.name}-${Date.now()}`);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    setImages(prev => [...prev, url]);
+  } catch(err) { 
+    console.error("업로드 오류:", err); 
+    alert("사진 업로드 실패: " + err.message); // 실패 사유 표시
+  }
+};
+  
 
   return (
     <div>
