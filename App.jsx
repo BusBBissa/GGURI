@@ -109,11 +109,15 @@ function HomeTab({ coupleId }) {
     if (saved) setImages(JSON.parse(saved));
 
     const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
+      const refDoc = doc(db, "couples", coupleId);
+      const snap = await getDoc(refDoc);
       if (snap.exists()) {
-        const d = snap.data();
-        setEvents(d.events || []);
-        setWeddingDate(d.weddingDate || "");
+        const data = snap.data();
+        setEvents(data.events || []);
+        setWeddingDate(data.weddingDate || "");
+      } else {
+        // 문서 없으면 생성
+        await setDoc(refDoc, { events: [], weddingDate: "" });
       }
     };
     load();
@@ -124,19 +128,19 @@ function HomeTab({ coupleId }) {
     localStorage.setItem(storageKey, JSON.stringify(images));
   }, [images]);
 
-  // ---------------- Firestore에 저장 ----------------
-  const saveField = async (field, value) => { 
+  // ---------------- Firestore 저장 ----------------
+  const saveField = async (field, value) => {
     const refDoc = doc(db, "couples", coupleId);
-    await setDoc(refDoc, { [field]: value }, { merge: true }); // merge:true로 기존 데이터 유지
+    await setDoc(refDoc, { [field]: value }, { merge: true });
   };
 
-  // weddingDate와 events 저장
+  // weddingDate와 events 변경 시 Firestore 저장
   useEffect(() => { saveField("weddingDate", weddingDate); }, [weddingDate]);
   useEffect(() => { saveField("events", events); }, [events]);
 
   // ---------------- 사진 슬라이드 ----------------
   useEffect(() => {
-    if(images.length < 2) return;
+    if (images.length < 2) return;
     const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
     return () => clearInterval(interval);
   }, [images]);
