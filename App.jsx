@@ -6,33 +6,29 @@ const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db =
 
 export default function App() { const [user, setUser] = useState(null); const [coupleId, setCoupleId] = useState(""); const [inputCoupleId, setInputCoupleId] = useState("");
 
-const [tab, setTab] = useState("home"); const [tasks, setTasks] = useState([]); const [taskText, setTaskText] = useState(""); const [events, setEvents] = useState([]); const [eventText, setEventText] = useState(""); const [eventDate, setEventDate] = useState(""); const [images, setImages] = useState([]);
+const [tab, setTab] = useState("home"); const [events, setEvents] = useState([]); const [eventText, setEventText] = useState(""); const [eventDate, setEventDate] = useState(""); const [images, setImages] = useState([]);
 
 useEffect(() => { onAuthStateChanged(auth, (u) => u && setUser(u)); }, []);
 
-useEffect(() => { if (!coupleId) return; const load = async () => { const snap = await getDoc(doc(db, "couples", coupleId)); if (snap.exists()) { const d = snap.data(); setTasks(d.tasks || []); setEvents(d.events || []); setImages(d.images || []); } }; load(); }, [coupleId]);
+useEffect(() => { if (!coupleId) return; const load = async () => { const snap = await getDoc(doc(db, "couples", coupleId)); if (snap.exists()) { const d = snap.data(); setEvents(d.events || []); setImages(d.images || []); } }; load(); }, [coupleId]);
 
-useEffect(() => { if (!coupleId) return; setDoc(doc(db, "couples", coupleId), { tasks, events, images }); }, [tasks, events, images, coupleId]);
+useEffect(() => { if (!coupleId) return; setDoc(doc(db, "couples", coupleId), { events, images }); }, [events, images, coupleId]);
 
 const login = () => signInWithPopup(auth, provider); const logout = () => signOut(auth);
 
-const createCouple = () => { const id = Math.random().toString(36).slice(2, 8); setCoupleId(id); navigator.clipboard.writeText(id); alert("초대 링크 복사됨: " + window.location.origin + "?id=" + id); };
+const createCouple = () => { const id = Math.random().toString(36).slice(2, 8); setCoupleId(id); navigator.clipboard.writeText(id); alert("초대 코드: " + id); };
 
 const joinCouple = () => setCoupleId(inputCoupleId);
 
-if (!user) { return ( <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"linear-gradient(135deg,#fce3ec,#ffe8d6)" }}> <div style={{ background:"white", padding:"40px", borderRadius:"30px", textAlign:"center", boxShadow:"0 10px 40px rgba(0,0,0,0.1)" }}> <h1 style={{ marginBottom:"20px" }}>💍 Wedding Planner</h1> <button onClick={login} style={{ padding:"12px 24px", borderRadius:"12px", border:"none", background:"#ff8fa3", color:"white" }}> Google로 시작하기 </button> </div> </div> ); }
+const today = new Date(); const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
 
-if (!coupleId) { return ( <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"linear-gradient(135deg,#fce3ec,#ffe8d6)" }}> <div style={{ background:"white", padding:"40px", borderRadius:"30px", textAlign:"center" }}> <h2>커플 연결</h2> <button onClick={createCouple} style={{ marginBottom:"20px" }}>초대 링크 생성</button> <div> <input placeholder="코드 입력" onChange={(e)=>setInputCoupleId(e.target.value)} /> <button onClick={joinCouple}>입장</button> </div> </div> </div> ); }
+if (!user) { return ( <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"linear-gradient(135deg,#fce3ec,#ffe8d6)" }}> <button onClick={login}>Google 로그인</button> </div> ); }
 
-return ( <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#fff,#fce3ec)" }}>
+if (!coupleId) { return ( <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center" }}> <div> <button onClick={createCouple}>커플 생성</button> <input onChange={(e)=>setInputCoupleId(e.target.value)} /> <button onClick={joinCouple}>입장</button> </div> </div> ); }
 
-{/* 헤더 */}
-  <div style={{ padding:"20px", display:"flex", justifyContent:"space-between" }}>
-    <h2>💖 Our Wedding</h2>
-    <button onClick={logout}>로그아웃</button>
-  </div>
+return ( <div style={{ minHeight:"100vh", background:"linear-gradient(#fff,#fce3ec)", paddingBottom:"80px" }}>
 
-  {/* 갤러리 */}
+{/* 이미지 */}
   <div style={{ padding:"10px" }}>
     <input type="file" multiple onChange={(e)=>{
       const files = Array.from(e.target.files);
@@ -43,57 +39,60 @@ return ( <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#ff
       })
     }} />
 
-    <div style={{ display:"flex", overflowX:"auto", gap:"10px", marginTop:"10px" }}>
-      {images.map((img,i)=>(
-        <img key={i} src={img} style={{ height:"160px", borderRadius:"20px" }} />
+    {images[0] && (
+      <img src={images[0]} style={{ width:"100%", borderRadius:"20px", marginTop:"10px" }} />
+    )}
+  </div>
+
+  {/* 홈: 사진 + 달력 */}
+  {tab === "home" && (
+    <div style={{ padding:"10px" }}>
+
+      {/* 달력 */}
+      <div style={{ background:"white", borderRadius:"20px", padding:"10px" }}>
+        <h3>{today.getFullYear()}년 {today.getMonth()+1}월</h3>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px" }}>
+          {[...Array(daysInMonth)].map((_,i)=>{
+            const date = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+            const hasEvent = events.find(e=>e.date===date);
+            return (
+              <div key={i} style={{ padding:"10px", borderRadius:"10px", background: hasEvent ? "#ffd6e0" : "#f9f9f9", fontSize:"12px" }}>
+                {i+1}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+    </div>
+  )}
+
+  {/* 달력 탭 */}
+  {tab === "calendar" && (
+    <div style={{ padding:"10px" }}>
+      <input placeholder="일정" onChange={(e)=>setEventText(e.target.value)} />
+      <input type="date" onChange={(e)=>setEventDate(e.target.value)} />
+      <button onClick={()=>setEvents([...events,{text:eventText,date:eventDate}])}>추가</button>
+
+      {events.map((e,i)=>(
+        <div key={i}>{e.date} - {e.text}</div>
       ))}
     </div>
+  )}
+
+  {/* 하단 탭 */}
+  <div style={{ position:"fixed", bottom:0, left:0, right:0, display:"flex", justifyContent:"space-around", background:"white", padding:"10px", borderTop:"1px solid #eee" }}>
+    {["home","calendar"].map(t=>(
+      <button key={t} onClick={()=>setTab(t)} style={{ border:"none", background: tab===t?"#ff8fa3":"transparent", color: tab===t?"white":"black", padding:"10px 20px", borderRadius:"20px" }}>
+        {t === "home" ? "홈" : "달력"}
+      </button>
+    ))}
   </div>
 
-  {/* 컨텐츠 */}
-  <div style={{ padding:"20px" }}>
-
-    {tab === "home" && (
-      <div style={{ background:"white", padding:"20px", borderRadius:"20px" }}>
-        <h3>커플 코드</h3>
-        <p>{coupleId}</p>
-      </div>
-    )}
-
-    {tab === "tasks" && (
-      <div style={{ background:"white", padding:"20px", borderRadius:"20px" }}>
-        <input value={taskText} onChange={(e)=>setTaskText(e.target.value)} />
-        <button onClick={()=>{setTasks([...tasks,{text:taskText,done:false}]);setTaskText("")}}>추가</button>
-        {tasks.map((t,i)=>(
-          <div key={i} style={{ display:"flex", justifyContent:"space-between" }}>
-            <span onClick={()=>{
-              let x=[...tasks];x[i].done=!x[i].done;setTasks(x);
-            }}>{t.done?"✅":"⬜"} {t.text}</span>
-            <button onClick={()=>setTasks(tasks.filter((_,idx)=>idx!==i))}>삭제</button>
-          </div>
-        ))}
-      </div>
-    )}
-
-    {tab === "calendar" && (
-      <div style={{ background:"white", padding:"20px", borderRadius:"20px" }}>
-        <input placeholder="일정" onChange={(e)=>setEventText(e.target.value)} />
-        <input type="date" onChange={(e)=>setEventDate(e.target.value)} />
-        <button onClick={()=>setEvents([...events,{text:eventText,date:eventDate}])}>추가</button>
-        {events.map((e,i)=>(
-          <div key={i}>{e.date} - {e.text}</div>
-        ))}
-      </div>
-    )}
-
-  </div>
-
-  {/* 하단 네비 */}
-  <div style={{ position:"fixed", bottom:0, left:0, right:0, background:"white", display:"flex", justifyContent:"space-around", padding:"10px" }}>
-    <button onClick={()=>setTab("home")}>홈</button>
-    <button onClick={()=>setTab("tasks")}>할일</button>
-    <button onClick={()=>setTab("calendar")}>달력</button>
-  </div>
+  {/* 초대 버튼 */}
+  <button onClick={createCouple} style={{ position:"fixed", bottom:"90px", right:"20px", background:"#ff8fa3", color:"white", border:"none", padding:"15px", borderRadius:"50%" }}>
+    +
+  </button>
 
 </div>
 
