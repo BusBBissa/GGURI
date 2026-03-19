@@ -316,6 +316,7 @@ function GuestsTab({ coupleId }) {
 
   // Firestore에서 불러오기
   useEffect(() => {
+    if (!coupleId) return;
     const load = async () => {
       const snap = await getDoc(doc(db, "couples", coupleId));
       if (snap.exists()) setGuests(snap.data().guests || []);
@@ -325,103 +326,74 @@ function GuestsTab({ coupleId }) {
 
   // Firestore에 저장
   useEffect(() => {
+    if (!coupleId) return;
     updateDoc(doc(db, "couples", coupleId), { guests });
   }, [guests, coupleId]);
 
-  // 신랑/신부별 그룹화 -> 카테고리별 정리
-  const grouped = guests.reduce((acc, g) => {
-    if (!acc[g.parent]) acc[g.parent] = {};
-    if (!acc[g.parent][g.category]) acc[g.parent][g.category] = [];
-    acc[g.parent][g.category].push(g);
-    return acc;
-  }, {});
+  // 상태 토글 순서
+  const statusOrder = ["미정", "참석예정", "불참"];
+  const toggleStatus = (guest) => {
+    setGuests(prev =>
+      prev.map(g =>
+        g === guest ? { ...g, status: statusOrder[(statusOrder.indexOf(g.status || "미정") + 1) % statusOrder.length] } : g
+      )
+    );
+  };
+
+  // 신랑 / 신부로 분류
+  const grouped = { 신랑: {}, 신부: {} };
+  guests.forEach(g => {
+    const parentGroup = grouped[g.parent];
+    if (!parentGroup[g.category]) parentGroup[g.category] = [];
+    parentGroup[g.category].push(g);
+  });
 
   const handleAdd = () => {
     if (!guestName || !guestCategory) return;
-    setGuests(prev => [...prev, { name: guestName, parent: guestParent, category: guestCategory, done: false }]);
-    setGuestName("");
-    setGuestCategory("");
-    setGuestParent("신랑");
+    setGuests(prev => [...prev, { name: guestName, category: guestCategory, parent: guestParent, status: "미정" }]);
+    setGuestName(""); setGuestCategory(""); setGuestParent("신랑");
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", padding: "15px" }}>
-      {["신랑", "신부"].map(parent => (
-        <div key={parent} style={{ background: "#fff", padding: "12px", borderRadius: "15px", boxShadow: "0 3px 10px rgba(0,0,0,0.1)" }}>
-          <h3 style={{ marginBottom: "10px", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>{parent}</h3>
+    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+      {/* 입력창 */}
+      <div style={{ flexBasis: "100%", display: "flex", gap: "5px", marginBottom: "15px" }}>
+        <select value={guestParent} onChange={e=>setGuestParent(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}>
+          <option>신랑</option>
+          <option>신부</option>
+        </select>
+        <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
+        <input placeholder="이름" value={guestName} onChange={e=>setGuestName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
+        <button onClick={handleAdd} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+      </div>
 
-          {/* 입력 */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "10px" }}>
-            <input
-              placeholder="카테고리"
-              value={guestCategory}
-              onChange={e => setGuestCategory(e.target.value)}
-              style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd" }}
-            />
-            <input
-              placeholder="이름"
-              value={guestName}
-              onChange={e => setGuestName(e.target.value)}
-              style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd" }}
-            />
-            <select value={guestParent} onChange={e => setGuestParent(e.target.value)} style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd" }}>
-              <option>신랑</option>
-              <option>신부</option>
-            </select>
-            <button
-              onClick={handleAdd}
-              style={{ padding: "8px 15px", borderRadius: "12px", background: "#ff8fa3", color: "#fff", border: "none", cursor: "pointer" }}
-            >
-              ➕ 추가
-            </button>
-          </div>
-
-          {/* 카테고리별 리스트 */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {grouped[parent] &&
-              Object.entries(grouped[parent]).map(([category, list]) => (
-                <div key={category}>
-                  <h4 style={{ marginBottom: "5px", fontWeight: "bold" }}>{category}</h4>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    {list.map((g, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "6px 10px",
-                          borderRadius: "10px",
-                          background: g.done ? "#d3ffd3" : "#ffe3e3",
-                        }}
-                      >
-                        <span style={{ textDecoration: g.done ? "line-through" : "none" }}>{g.name}</span>
-                        <button
-                          onClick={() => setGuests(prev => prev.map(item => item === g ? { ...item, done: !item.done } : item))}
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "12px",
-                            border: "none",
-                            background: g.done ? "#ff6f91" : "#6fff91",
-                            color: "#fff",
-                            cursor: "pointer",
-                            fontSize: "12px"
-                          }}
-                        >
-                          {g.done ? "완료" : "미완료"}
-                        </button>
-                      </div>
-                    ))}
+      {/* 신랑 / 신부 컬럼 */}
+      {["신랑","신부"].map(parent => (
+        <div key={parent} style={{flex:1, minWidth:"250px"}}>
+          <h3 style={{textAlign:"center", marginBottom:"10px"}}>{parent}</h3>
+          {Object.entries(grouped[parent]).map(([cat, list]) => (
+            <div key={cat} style={{marginBottom:"10px"}}>
+              <b>{cat}</b>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginTop:"5px" }}>
+                {list.map((g,i) => (
+                  <div key={i} onClick={()=>toggleStatus(g)}
+                    style={{
+                      padding:"8px", borderRadius:"10px",
+                      background: g.status==="참석예정"?"#c3f3c3":g.status==="불참"?"#f3c3c3":"#f9f9f9",
+                      textAlign:"center", cursor:"pointer",
+                      boxShadow:"0 1px 3px rgba(0,0,0,0.1)"
+                    }}>
+                    {g.name} ({g.status})
                   </div>
-                </div>
-              ))}
-          </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ))}
     </div>
   );
 }
-
 // ---------------- BudgetTab ----------------
 function BudgetTab({ coupleId }) {
   const [budgetItems, setBudgetItems] = useState([]);
