@@ -101,56 +101,64 @@ function HomeTab({ coupleId }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
 
-  const storageKey = `wedding_data_${coupleId}`;
+  // Firestore 문서 참조
+  const coupleDoc = doc(db, "couples", coupleId);
 
-  // ---------------- 불러오기 ----------------
+  // ---------------- 초기 데이터 불러오기 ----------------
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
-    if (saved.images) setImages(saved.images);
-    if (saved.events) setEvents(saved.events);
-    if (saved.weddingDate) setWeddingDate(saved.weddingDate);
-
-    const loadFirestore = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
+    const load = async () => {
+      const snap = await getDoc(coupleDoc);
       if (snap.exists()) {
         const data = snap.data();
-        setImages(data.images || saved.images || []);
-        setEvents(data.events || saved.events || []);
-        setWeddingDate(data.weddingDate || saved.weddingDate || "");
+        setWeddingDate(data.weddingDate || "");
+        setEvents(data.events || []);
+        setImages(data.images || []); // Storage URL 배열
       }
     };
-    loadFirestore();
+    load();
   }, [coupleId]);
+
+  // ---------------- 저장 함수 ----------------
+  const saveField = async (field, value) => {
+    await updateDoc(coupleDoc, { [field]: value });
+  };
+
+  useEffect(() => { if(events.length) saveField("events", events); }, [events]);
+  useEffect(() => { if(weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
+  useEffect(() => { if(images.length) saveField("images", images); }, [images]);
+
+  // ---------------- 사진 업로드 ----------------
+  const uploadImage = async (file) => {
+    try {
+      const storageRef = ref(storage, `couples/${coupleId}/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setImages(prev => [...prev, url]);
+    } catch (err) {
+      console.error("사진 업로드 실패:", err);
+      alert("사진 업로드에 실패했습니다.");
+    }
+  };
+
+  // ---------------- 사진 삭제 ----------------
+  const deleteImage = async (idx) => {
+    const url = images[idx];
+    // Storage에서 삭제
+    try {
+      const storageRef = ref(storage, url);
+      await storageRef.delete(); // Firebase v9에서는 delete 함수 별도 import 필요
+    } catch(e) {
+      // Storage에서 삭제 실패해도 Firestore에서만 제거
+    }
+    setImages(prev => prev.filter((_,i)=>i!==idx));
+  };
 
   // ---------------- 사진 슬라이드 ----------------
   useEffect(() => {
-    if (images.length < 2) return;
+    if(images.length < 2) return;
     const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
     return () => clearInterval(interval);
   }, [images]);
-
-  // ---------------- 이미지 업로드 및 용량 줄이기 ----------------
-  const uploadImage = (file) => {
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = e => {
-      img.src = e.target.result;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const scale = Math.min(1, 800 / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.8);
-        const newImages = [...images, resizedDataUrl];
-        setImages(newImages);
-        localStorage.setItem(storageKey, JSON.stringify({ images: newImages, events, weddingDate }));
-        updateDoc(doc(db, "couples", coupleId), { images: newImages, events, weddingDate });
-      };
-    };
-    reader.readAsDataURL(file);
-  };
 
   // ---------------- 달력 계산 ----------------
   const today = new Date();
@@ -158,21 +166,8 @@ function HomeTab({ coupleId }) {
   const year = firstDay.getFullYear();
   const month = firstDay.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = firstDay.getDay(); // 1일이 무슨 요일인지
+  const firstDayOfMonth = firstDay.getDay(); // 0~6
   const weekdays = ["일","월","화","수","목","금","토"];
-
-  // ---------------- D-day 계산 ----------------
-  const dday = weddingDate ? Math.floor((new Date(weddingDate) - new Date()) / (1000*60*60*24)) : "?";
-
-  // ---------------- 일정 추가 ----------------
-  const addEvent = () => {
-    if (!eventText || !selectedDate) return;
-    const newEvents = [...events, { text: eventText, date: selectedDate }];
-    setEvents(newEvents);
-    setEventText("");
-    localStorage.setItem(storageKey, JSON.stringify({ images, events: newEvents, weddingDate }));
-    updateDoc(doc(db, "couples", coupleId), { images, events: newEvents, weddingDate });
-  };
 
   return (
     <div>
@@ -184,7 +179,10 @@ function HomeTab({ coupleId }) {
         </label>
         <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
           {images.map((img, idx)=>(
-            <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
+            <div key={idx} style={{position:"relative"}}>
+              <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
+              <button onClick={()=>deleteImage(idx)} style={{position:"absolute", top:0, right:0, background:"red", color:"white", border:"none", borderRadius:"50%", width:"20px", height:"20px", cursor:"pointer"}}>×</button>
+            </div>
           ))}
         </div>
       </div>
@@ -198,17 +196,12 @@ function HomeTab({ coupleId }) {
 
       {/* D-day */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
-        <h2>D-{dday}</h2>
-        <input type="date" value={weddingDate} onChange={e=>{
-          setWeddingDate(e.target.value);
-          localStorage.setItem(storageKey, JSON.stringify({ images, events, weddingDate: e.target.value }));
-          updateDoc(doc(db, "couples", coupleId), { images, events, weddingDate: e.target.value });
-        }} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
+        <h2>D-{weddingDate ? Math.floor((new Date(weddingDate)-new Date())/(1000*60*60*24)) : "?"}</h2>
+        <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
       </div>
 
       {/* 달력 */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
-        {/* 이전/다음 달 버튼 */}
         <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
           <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
           <h3>{year}년 {month+1}월</h3>
@@ -227,16 +220,11 @@ function HomeTab({ coupleId }) {
           {Array(firstDayOfMonth).fill(null).map((_,i)=><div key={"blank"+i}></div>)}
           {Array(daysInMonth).fill(null).map((_,i)=>{
             const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
-            const dayEvents = events.filter(e=>e.date===date);
+            const hasEvent = events.find(e=>e.date===date);
             return (
               <div key={i} onClick={()=>setSelectedDate(date)}
-                   style={{
-                     padding:"12px",
-                     borderRadius:"10px",
-                     background: dayEvents.length ? "#ffccd5" : "#f9f9f9",
-                     textAlign:"center",
-                     cursor:"pointer"
-                   }}>
+                style={{padding:"12px", borderRadius:"10px", background: hasEvent ? "#ffccd5" : "#f9f9f9", textAlign:"center", cursor:"pointer"}}
+              >
                 {i+1}
               </div>
             )
@@ -249,7 +237,11 @@ function HomeTab({ coupleId }) {
             <h4>{selectedDate}</h4>
             {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
             <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
-            <button onClick={addEvent} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
+            <button onClick={()=>{
+              if(!eventText) return;
+              setEvents(prev => [...prev,{text:eventText,date:selectedDate}]);
+              setEventText("");
+            }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
           </div>
         )}
       </div>
