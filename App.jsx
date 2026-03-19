@@ -281,7 +281,7 @@ function GuestsTab({ coupleId }) {
 function BudgetTab({ coupleId }) {
   const [budgetItems, setBudgetItems] = useState([]);
   const [budgetName, setBudgetName] = useState("");
-  
+  const [budgetCost, setBudgetCost] = useState("");  
 
   // Firestore에서 불러오기
   useEffect(() => {
