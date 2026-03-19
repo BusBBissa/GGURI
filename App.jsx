@@ -119,40 +119,42 @@ function HomeTab({ coupleId }) {
     load();
   }, [coupleId]);
 
-  // ---------------- LocalStorage에 저장 ----------------
+  // ---------------- LocalStorage 저장 ----------------
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(images));
   }, [images]);
 
+  // ---------------- Firestore에 저장 ----------------
   const saveField = async (field, value) => { 
-    await updateDoc(doc(db, "couples", coupleId), { [field]: value }); 
+    const refDoc = doc(db, "couples", coupleId);
+    await setDoc(refDoc, { [field]: value }, { merge: true }); // merge:true로 기존 데이터 유지
   };
 
-  useEffect(() => { if(events.length) saveField("events", events); }, [events]);
-  useEffect(() => { if(weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
+  // weddingDate와 events 저장
+  useEffect(() => { saveField("weddingDate", weddingDate); }, [weddingDate]);
+  useEffect(() => { saveField("events", events); }, [events]);
 
-  // ---------------- 사진 슬라이드 자동 ----------------
+  // ---------------- 사진 슬라이드 ----------------
   useEffect(() => {
     if(images.length < 2) return;
     const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
     return () => clearInterval(interval);
   }, [images]);
 
-  // ---------------- 사진 업로드 (모바일 & 용량 대응) ----------------
+  // ---------------- 사진 업로드 ----------------
   const uploadImage = (file) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.src = reader.result;
       img.onload = () => {
-        // 최대 너비 800px 유지, 비율 맞춤
         const scale = Math.min(1, 800 / img.width);
         const canvas = document.createElement("canvas");
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.8); // 용량 줄이기
+        const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.8);
         setImages(prev => [...prev, resizedDataUrl]);
       };
     };
@@ -165,7 +167,7 @@ function HomeTab({ coupleId }) {
   const year = firstDay.getFullYear();
   const month = firstDay.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = firstDay.getDay(); // 달력 첫 날 요일
+  const firstDayOfMonth = firstDay.getDay();
   const weekdays = ["일","월","화","수","목","금","토"];
 
   return (
