@@ -1,180 +1,85 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import React, { useState, useEffect } from "react"; import { initializeApp } from "firebase/app"; import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth"; import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBzMM4swUjS08WjOqSF7RmfaHOsfVc8gSg",
-  authDomain: "gguri-e94ae.firebaseapp.com",
-  projectId: "gguri-e94ae",
-};
+const firebaseConfig = { apiKey: "AIzaSyBzMM4swUjS08WjOqSF7RmfaHOsfVc8gSg", authDomain: "gguri-e94ae.firebaseapp.com", projectId: "gguri-e94ae", };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
+const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app); const provider = new GoogleAuthProvider();
 
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [coupleId, setCoupleId] = useState("");
-  const [inputCoupleId, setInputCoupleId] = useState("");
+export default function App() { const [user, setUser] = useState(null); const [coupleId, setCoupleId] = useState(""); const [inputCoupleId, setInputCoupleId] = useState("");
 
-  const [guests, setGuests] = useState([]);
-  const [guestName, setGuestName] = useState("");
+const [tab, setTab] = useState("home"); const [tasks, setTasks] = useState([]); const [taskText, setTaskText] = useState(""); const [events, setEvents] = useState([]); const [eventText, setEventText] = useState(""); const [eventDate, setEventDate] = useState(""); const [image, setImage] = useState("");
 
-  const [items, setItems] = useState([]);
-  const [itemName, setItemName] = useState("");
-  const [itemCost, setItemCost] = useState("");
-  const [category, setCategory] = useState("웨딩홀");
-  const [budgetLimit, setBudgetLimit] = useState(0);
+useEffect(() => { onAuthStateChanged(auth, (u) => u && setUser(u)); }, []);
 
-  const [tasks, setTasks] = useState([]);
-  const [taskText, setTaskText] = useState("");
-  const [assignee, setAssignee] = useState("같이");
+useEffect(() => { if (!coupleId) return; const load = async () => { const snap = await getDoc(doc(db, "couples", coupleId)); if (snap.exists()) { const d = snap.data(); setTasks(d.tasks || []); setEvents(d.events || []); setImage(d.image || ""); } }; load(); }, [coupleId]);
 
-  const [events, setEvents] = useState([]);
-  const [eventText, setEventText] = useState("");
-  const [eventDate, setEventDate] = useState("");
+useEffect(() => { if (!coupleId) return; setDoc(doc(db, "couples", coupleId), { tasks, events, image }); }, [tasks, events, image, coupleId]);
 
-  const [memo, setMemo] = useState("");
-  const [weddingDate, setWeddingDate] = useState("");
+const login = () => signInWithPopup(auth, provider);
 
-  useEffect(() => {
-    onAuthStateChanged(auth, (u) => u && setUser(u));
-  }, []);
+const createCouple = () => { const id = Math.random().toString(36).slice(2, 8); setCoupleId(id); navigator.clipboard.writeText(id); alert("코드 복사됨: " + id); };
 
-  useEffect(() => {
-    if (!coupleId) return;
-    const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
-      if (snap.exists()) {
-        const d = snap.data();
-        setGuests(d.guests || []);
-        setItems(d.items || []);
-        setTasks(d.tasks || []);
-        setEvents(d.events || []);
-        setMemo(d.memo || "");
-        setBudgetLimit(d.budgetLimit || 0);
-        setWeddingDate(d.weddingDate || "");
-      }
-    };
-    load();
-  }, [coupleId]);
+const joinCouple = () => setCoupleId(inputCoupleId);
 
-  useEffect(() => {
-    if (!coupleId) return;
-    setDoc(doc(db, "couples", coupleId), {
-      guests, items, tasks, events, memo, budgetLimit, weddingDate
-    });
-  }, [guests, items, tasks, events, memo, budgetLimit, weddingDate, coupleId]);
+if (!user) { return ( <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"#f8f5f2" }}> <div style={{ background:"white", padding:"40px", borderRadius:"20px", textAlign:"center" }}> <h1>Wedding</h1> <button onClick={login}>Google 로그인</button> </div> </div> ); }
 
-  useEffect(() => {
-    if (tasks.length === 0 && coupleId) {
-      setTasks([
-        { text: "웨딩홀 계약", done: false, who: "같이" },
-        { text: "스드메 예약", done: false, who: "같이" },
-        { text: "청첩장 제작", done: false, who: "신부" },
-        { text: "신혼여행 예약", done: false, who: "신랑" },
-      ]);
-    }
-  }, [coupleId]);
+if (!coupleId) { return ( <div style={{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center" }}> <div> <button onClick={createCouple}>커플 생성</button> <input onChange={(e)=>setInputCoupleId(e.target.value)} /> <button onClick={joinCouple}>입장</button> </div> </div> ); }
 
-  const login = () => signInWithPopup(auth, provider);
+return ( <div style={{ padding:"20px", background:"#f8f5f2", minHeight:"100vh" }}>
 
-  const createCouple = () => setCoupleId(Math.random().toString(36).slice(2, 8));
-  const joinCouple = () => setCoupleId(inputCoupleId);
+{/* 대표 이미지 */}
+  <div style={{ marginBottom:"20px" }}>
+    {image && <img src={image} style={{ width:"100%", borderRadius:"20px" }} />}
+    <input type="file" onChange={(e)=>{
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = ()=> setImage(reader.result);
+      reader.readAsDataURL(file);
+    }} />
+  </div>
 
-  const totalCost = useMemo(() => items.reduce((a, b) => a + b.cost, 0), [items]);
-  const progress = useMemo(() => tasks.length ? Math.round(tasks.filter(t => t.done).length / tasks.length * 100) : 0, [tasks]);
+  {/* 탭 */}
+  <div style={{ display:"flex", justifyContent:"space-around", marginBottom:"20px" }}>
+    <button onClick={()=>setTab("home")}>홈</button>
+    <button onClick={()=>setTab("tasks")}>할일</button>
+    <button onClick={()=>setTab("calendar")}>달력</button>
+  </div>
 
-  const dday = useMemo(() => {
-    if (!weddingDate) return null;
-    return Math.ceil((new Date(weddingDate) - new Date()) / (1000*60*60*24));
-  }, [weddingDate]);
-
-  const card = {
-    background: "white",
-    padding: "16px",
-    borderRadius: "16px",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
-    marginBottom: "16px"
-  };
-
-  if (!user) return <button onClick={login}>Google 로그인</button>;
-
-  if (!coupleId) return (
+  {/* 홈 */}
+  {tab === "home" && (
     <div>
-      <button onClick={createCouple}>커플 생성</button>
-      <input onChange={(e)=>setInputCoupleId(e.target.value)} />
-      <button onClick={joinCouple}>입장</button>
+      <h2>우리의 웨딩</h2>
+      <p>커플코드: {coupleId}</p>
     </div>
-  );
+  )}
 
-  return (
-    <div style={{ background:"#f5f5f5", padding:"20px", minHeight:"100vh" }}>
-      
-      <div style={card}>
-        <h2>D-Day {dday ? `D-${dday}` : "설정 필요"}</h2>
-        <input type="date" onChange={(e)=>setWeddingDate(e.target.value)} />
-        <div>진행률: {progress}%</div>
-      </div>
-
-      <div style={card}>
-        <h2>하객</h2>
-        <input value={guestName} onChange={e=>setGuestName(e.target.value)} />
-        <button onClick={()=>{setGuests([...guests,{name:guestName,att:false}]);setGuestName("")}}>추가</button>
-        {guests.map((g,i)=>(
-          <div key={i}>
-            {g.name}
-            <button onClick={()=>{let x=[...guests];x[i].att=!x[i].att;setGuests(x)}}>✔</button>
-            <button onClick={()=>setGuests(guests.filter((_,idx)=>idx!==i))}>❌</button>
-          </div>
-        ))}
-      </div>
-
-      <div style={card}>
-        <h2>예산</h2>
-        <input placeholder="총 예산" onChange={e=>setBudgetLimit(+e.target.value)} />
-        <div>총: {totalCost}</div>
-        {totalCost>budgetLimit && <div>⚠️ 초과</div>}
-        <select onChange={e=>setCategory(e.target.value)}>
-          <option>웨딩홀</option><option>스드메</option><option>예물</option><option>혼수</option>
-        </select>
-        <input value={itemName} onChange={e=>setItemName(e.target.value)} />
-        <input value={itemCost} onChange={e=>setItemCost(e.target.value)} />
-        <button onClick={()=>{setItems([...items,{name:itemName,cost:+itemCost,category}]);setItemName("");setItemCost("")}}>추가</button>
-      </div>
-
-      <div style={card}>
-        <h2>할 일</h2>
-        <input value={taskText} onChange={e=>setTaskText(e.target.value)} />
-        <select onChange={e=>setAssignee(e.target.value)}>
-          <option>신랑</option><option>신부</option><option>같이</option>
-        </select>
-        <button onClick={()=>setTasks([...tasks,{text:taskText,done:false,who:assignee}])}>추가</button>
-
-        {tasks.map((t,i)=>(
-          <div key={i}>
-            [{t.who}] {t.text}
-            <button onClick={()=>{let x=[...tasks];x[i].done=!x[i].done;setTasks(x)}}>✔</button>
-            <button onClick={()=>setTasks(tasks.filter((_,idx)=>idx!==i))}>❌</button>
-          </div>
-        ))}
-      </div>
-
-      <div style={card}>
-        <h2>일정</h2>
-        <input onChange={e=>setEventText(e.target.value)} />
-        <input type="date" onChange={e=>setEventDate(e.target.value)} />
-        <button onClick={()=>setEvents([...events,{text:eventText,date:eventDate}])}>추가</button>
-        {events.map((e,i)=>(<div key={i}>{e.text} - {e.date}</div>))}
-      </div>
-
-      <div style={card}>
-        <h2>메모</h2>
-        <textarea value={memo} onChange={e=>setMemo(e.target.value)} style={{width:"100%"}}/>
-      </div>
-
+  {/* 할일 */}
+  {tab === "tasks" && (
+    <div>
+      <input value={taskText} onChange={(e)=>setTaskText(e.target.value)} />
+      <button onClick={()=>{setTasks([...tasks,{text:taskText,done:false}]);setTaskText("")}}>추가</button>
+      {tasks.map((t,i)=>(
+        <div key={i}>
+          <span onClick={()=>{
+            let x=[...tasks];x[i].done=!x[i].done;setTasks(x);
+          }}>{t.done?"✅":"⬜"} {t.text}</span>
+        </div>
+      ))}
     </div>
-  );
-}
+  )}
+
+  {/* 달력 */}
+  {tab === "calendar" && (
+    <div>
+      <input placeholder="일정" onChange={(e)=>setEventText(e.target.value)} />
+      <input type="date" onChange={(e)=>setEventDate(e.target.value)} />
+      <button onClick={()=>setEvents([...events,{text:eventText,date:eventDate}])}>추가</button>
+
+      {events.map((e,i)=>(
+        <div key={i}>{e.date} - {e.text}</div>
+      ))}
+    </div>
+  )}
+
+</div>
+
+); }
