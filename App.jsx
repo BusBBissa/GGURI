@@ -4,20 +4,19 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { getFirestore, doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Firebase 초기화
+// ---------------- Firebase 초기화 ----------------
 const firebaseConfig = {
   apiKey: "AIzaSyBzMM4swUjS08WjOqSF7RmfaHOsfVc8gSg",
   authDomain: "gguri-e94ae.firebaseapp.com",
   projectId: "gguri-e94ae",
 };
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
-// ---------------- App 컴포넌트 ----------------
+// ---------------- App ----------------
 export default function App() {
   const [user, setUser] = useState(null);
   const [coupleId, setCoupleId] = useState("");
@@ -33,22 +32,14 @@ export default function App() {
     const id = Math.random().toString(36).slice(2, 8);
     setCoupleId(id);
     navigator.clipboard.writeText(id);
-    await setDoc(doc(db, "couples", id), {}); // 초기 document 생성
+    await setDoc(doc(db, "couples", id), {});
     alert("초대 코드: " + id);
   };
   const joinCouple = () => setCoupleId(inputCoupleId);
 
-  // 인증 전
-  if (!user) return (
-    <AuthPage login={login} />
-  );
+  if (!user) return <AuthPage login={login} />;
+  if (!coupleId) return <JoinCouplePage createCouple={createCouple} joinCouple={joinCouple} inputCoupleId={inputCoupleId} setInputCoupleId={setInputCoupleId} />;
 
-  // 커플 선택 전
-  if (!coupleId) return (
-    <JoinCouplePage createCouple={createCouple} joinCouple={joinCouple} inputCoupleId={inputCoupleId} setInputCoupleId={setInputCoupleId} />
-  );
-
-  // 메인 페이지
   return (
     <div style={{minHeight:"100vh", background:"#fff5f7", padding:"20px", fontFamily:"'Arial', sans-serif"}}>
       <TabBar tab={tab} setTab={setTab} logout={logout} />
@@ -60,7 +51,7 @@ export default function App() {
   );
 }
 
-// ---------------- 인증 페이지 ----------------
+// ---------------- Auth ----------------
 function AuthPage({ login }) {
   return (
     <div style={{height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"linear-gradient(135deg,#fce3ec,#ffe8d6)"}}>
@@ -72,7 +63,7 @@ function AuthPage({ login }) {
   );
 }
 
-// ---------------- 커플 선택/생성 페이지 ----------------
+// ---------------- Join Couple ----------------
 function JoinCouplePage({ createCouple, joinCouple, inputCoupleId, setInputCoupleId }) {
   return (
     <div style={{height:"100vh", display:"flex", justifyContent:"center", alignItems:"center", background:"#fff0f5"}}>
@@ -87,7 +78,7 @@ function JoinCouplePage({ createCouple, joinCouple, inputCoupleId, setInputCoupl
   );
 }
 
-// ---------------- 탭 바 ----------------
+// ---------------- TabBar ----------------
 function TabBar({ tab, setTab, logout }) {
   return (
     <div style={{display:"flex", gap:"10px", marginBottom:"20px"}}>
@@ -111,7 +102,6 @@ function HomeTab({ coupleId }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
 
-  // Firestore 로딩
   useEffect(() => {
     const load = async () => {
       const snap = await getDoc(doc(db, "couples", coupleId));
@@ -125,16 +115,11 @@ function HomeTab({ coupleId }) {
     load();
   }, [coupleId]);
 
-  // Firestore 업데이트
-  const saveField = async (field, value) => {
-    await updateDoc(doc(db, "couples", coupleId), { [field]: value });
-  };
-
+  const saveField = async (field, value) => { await updateDoc(doc(db, "couples", coupleId), { [field]: value }); };
   useEffect(() => { if(images.length) saveField("images", images); }, [images]);
   useEffect(() => { if(events.length) saveField("events", events); }, [events]);
   useEffect(() => { if(weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
 
-  // 이미지 슬라이드
   useEffect(() => {
     if(images.length < 2) return;
     const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
@@ -148,21 +133,21 @@ function HomeTab({ coupleId }) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const dday = weddingDate ? Math.ceil((new Date(weddingDate) - new Date()) / (1000*60*60*24)) : null;
 
-  // 이미지 업로드 (Firebase Storage)
   const uploadImage = async (file) => {
-    const storageRef = ref(storage, `images/${coupleId}/${file.name}-${Date.now()}`);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    setImages([...images, url]);
+    try {
+      const storageRef = ref(storage, `images/${coupleId}/${file.name}-${Date.now()}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setImages(prev => [...prev, url]);
+    } catch(err) { console.error(err); alert("사진 업로드 실패"); }
   };
 
   return (
     <div>
-      {/* 사진 업로드 + 미리보기 */}
       <div style={{marginBottom:"20px"}}>
         <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
           사진 추가
-          <input type="file" style={{display:"none"}} onChange={e=>{ if(e.target.files[0]) uploadImage(e.target.files[0]); }} />
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ if(e.target.files[0]) uploadImage(e.target.files[0]); }} />
         </label>
         <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
           {images.map((img, idx)=>(
@@ -171,20 +156,17 @@ function HomeTab({ coupleId }) {
         </div>
       </div>
 
-      {/* 슬라이드 */}
       {images.length>0 && (
         <div style={{width:"100%", maxHeight:"50vh", borderRadius:"20px", overflow:"hidden", marginBottom:"20px", display:"flex", justifyContent:"center", alignItems:"center", background:"#fff"}}>
           <img src={images[currentImage]} style={{maxWidth:"100%", maxHeight:"100%", objectFit:"contain"}} />
         </div>
       )}
 
-      {/* D-day */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
         <h2>D-{dday ?? "?"}</h2>
         <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
       </div>
 
-      {/* 달력 */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
         <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
           <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
@@ -204,7 +186,8 @@ function HomeTab({ coupleId }) {
             {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
             <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
             <button onClick={()=>{
-              setEvents([...events,{text:eventText,date:selectedDate}]);
+              if(!eventText) return;
+              setEvents(prev => [...prev,{text:eventText,date:selectedDate}]);
               setEventText("");
             }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
           </div>
@@ -220,24 +203,16 @@ function TasksTab({ coupleId }) {
   const [taskText, setTaskText] = useState("");
   const [taskCategory, setTaskCategory] = useState("");
 
-  // Firestore 로딩
-  useEffect(() => {
-    const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
-      if (snap.exists()) setTasks(snap.data().tasks || []);
-    };
-    load();
-  }, [coupleId]);
-
-  // Firestore 업데이트
-  useEffect(() => { if(tasks.length) updateDoc(doc(db, "couples", coupleId), { tasks }); }, [tasks]);
+  useEffect(() => { const load = async () => { const snap = await getDoc(doc(db,"couples",coupleId)); if(snap.exists()) setTasks(snap.data().tasks || []); }; load(); }, [coupleId]);
+  useEffect(() => { updateDoc(doc(db,"couples",coupleId), {tasks}); }, [tasks]);
 
   return (
     <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
       <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
       <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"60%", marginRight:"5px"}}/>
       <button onClick={()=>{
-        setTasks([...tasks,{text:taskText,category:taskCategory,done:false}]);
+        if(!taskText || !taskCategory) return;
+        setTasks(prev => [...prev,{text:taskText,category:taskCategory,done:false}]);
         setTaskText(""); setTaskCategory("");
       }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
 
@@ -248,7 +223,7 @@ function TasksTab({ coupleId }) {
             {list.map((t,i)=>(
               <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0"}}>
                 <span style={{textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
-                <button onClick={()=>{let x=[...tasks]; x[tasks.indexOf(t)].done=!x[tasks.indexOf(t)].done; setTasks(x)}}>{t.done?"완료":"미완료"}</button>
+                <button onClick={()=>{ setTasks(prev => prev.map(item => item===t ? {...item, done:!item.done} : item)); }}>{t.done?"완료":"미완료"}</button>
               </div>
             ))}
           </div>
@@ -258,6 +233,50 @@ function TasksTab({ coupleId }) {
   );
 }
 
-// ---------------- GuestsTab & BudgetTab ----------------
-// GuestsTab, BudgetTab는 동일 패턴으로 작성 가능: state 관리 + Firestore updateDoc
-// 필요시 요청하시면 제가 이어서 완성된 버전까지 만들어 드릴 수 있음.
+// ---------------- GuestsTab ----------------
+function GuestsTab({ coupleId }) {
+  const [guests, setGuests] = useState([]);
+  const [guestName, setGuestName] = useState("");
+  const [guestParent, setGuestParent] = useState("신랑");
+  const [guestCategory, setGuestCategory] = useState("");
+  const [guestSearch, setGuestSearch] = useState("");
+
+  useEffect(() => { const load = async () => { const snap = await getDoc(doc(db,"couples",coupleId)); if(snap.exists()) setGuests(snap.data().guests || []); }; load(); }, [coupleId]);
+  useEffect(() => { updateDoc(doc(db,"couples",coupleId), {guests}); }, [guests]);
+
+  const filtered = guests.filter(g=>g.name.includes(guestSearch) || g.category.includes(guestSearch));
+
+  return (
+    <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
+      <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
+        <select value={guestParent} onChange={e=>setGuestParent(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}>
+          <option>신랑</option>
+          <option>신부</option>
+        </select>
+        <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
+        <input placeholder="이름" value={guestName} onChange={e=>setGuestName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
+        <button onClick={()=>{
+          if(!guestName || !guestCategory) return;
+          setGuests(prev => [...prev,{name:guestName,parent:guestParent,category:guestCategory}]);
+          setGuestName(""); setGuestCategory(""); setGuestParent("신랑");
+        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+      </div>
+      <input placeholder="검색" value={guestSearch} onChange={e=>setGuestSearch(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"100%", marginBottom:"10px"}}/>
+      <div>
+        {filtered.map((g,i)=>(
+          <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #eee"}}>
+            <span>{g.parent} - {g.category} - {g.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------- BudgetTab ----------------
+function BudgetTab({ coupleId }) {
+  const [budgetItems, setBudgetItems] = useState([]);
+  const [budgetName, setBudgetName] = useState("");
+  const [budgetCost, setBudgetCost] = useState("");
+
+  useEffect(() => { const load = async () =>
