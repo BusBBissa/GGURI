@@ -145,7 +145,6 @@ function HomeTab({ coupleId }) {
     reader.readAsDataURL(file);
   };
 
-  // 아래부터 기존 JSX 동일
   return (
     <div>
       {/* 사진 업로드 */}
@@ -204,6 +203,7 @@ function HomeTab({ coupleId }) {
     </div>
   );
 }
+
 
 // ---------------- TasksTab ----------------
 function TasksTab({ coupleId }) {
