@@ -18,10 +18,9 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [coupleId, setCoupleId] = useState("");
   const [inputCoupleId, setInputCoupleId] = useState("");
-
   const [tab, setTab] = useState("home");
 
-  // 사진 슬라이드
+  // 사진
   const [images, setImages] = useState([]);
   const [currentImage, setCurrentImage] = useState(0);
 
@@ -84,12 +83,13 @@ export default function App() {
     if (images.length < 2) return;
     const interval = setInterval(() => {
       setCurrentImage((prev) => (prev + 1) % images.length);
-    }, 3000); // 3초
+    }, 3000);
     return () => clearInterval(interval);
   }, [images]);
 
   const login = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
+
   const createCouple = () => {
     const id = Math.random().toString(36).slice(2, 8);
     setCoupleId(id);
@@ -106,18 +106,19 @@ export default function App() {
   const dday = weddingDate ? Math.ceil((new Date(weddingDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
   const totalBudget = budgetItems.reduce((a, b) => a + b.cost, 0);
 
-  if (!user) {
+  if (!user)
     return (
       <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#fce3ec,#ffe8d6)" }}>
         <div style={{ textAlign: "center" }}>
           <h1 style={{ fontSize: "40px", marginBottom: "20px" }}>💍 Wedding</h1>
-          <button onClick={login} style={{ padding: "15px 40px", fontSize: "18px", borderRadius: "20px", border: "none", background: "#ff6f91", color: "#fff", cursor: "pointer" }}>Google 로그인</button>
+          <button onClick={login} style={{ padding: "15px 40px", fontSize: "18px", borderRadius: "20px", border: "none", background: "#ff6f91", color: "#fff", cursor: "pointer" }}>
+            Google 로그인
+          </button>
         </div>
       </div>
     );
-  }
 
-  if (!coupleId) {
+  if (!coupleId)
     return (
       <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#fff0f5" }}>
         <div style={{ textAlign: "center", background: "#fff", padding: "30px", borderRadius: "20px", boxShadow: "0 5px 20px rgba(0,0,0,0.1)" }}>
@@ -129,11 +130,9 @@ export default function App() {
         </div>
       </div>
     );
-  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#fff5f7", padding: "20px", fontFamily: "'Arial',sans-serif" }}>
-
       {/* 탭 */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
         {["home", "tasks", "guests", "budget"].map(t => (
@@ -144,7 +143,7 @@ export default function App() {
         <button onClick={logout} style={{ marginLeft: "10px", padding: "8px 12px", borderRadius: "12px", background: "#ffb3c1", border: "none" }}>로그아웃</button>
       </div>
 
-      {/* 홈 화면 */}
+      {/* 홈 */}
       {tab === "home" && (
         <div>
           {/* 사진 슬라이드 */}
@@ -168,8 +167,8 @@ export default function App() {
 
           {/* D-day */}
           <div style={{ background: "white", padding: "20px", borderRadius: "20px", textAlign: "center", marginBottom: "20px" }}>
-            <h2>D-{dday ?? "?"}</h2>
-            <input type="date" value={weddingDate} onChange={(e) => setWeddingDate(e.target.value)} style={{ padding: "10px", borderRadius: "12px", border: "1px solid #ddd", marginTop: "10px" }} />
+            <h2 style={{ fontSize: "36px", color: "#ff6f91" }}>D-{dday ?? "?"}</h2>
+            <input type="date" value={weddingDate} onChange={(e) => setWeddingDate(e.target.value)} style={{ padding: "10px", borderRadius: "12px", border: "1px solid #ddd", marginTop: "10px", fontSize: "16px" }} />
           </div>
 
           {/* 달력 */}
@@ -190,7 +189,6 @@ export default function App() {
                 );
               })}
             </div>
-
             {selectedDate && (
               <div style={{ marginTop: "10px" }}>
                 <h4>{selectedDate}</h4>
@@ -203,21 +201,71 @@ export default function App() {
         </div>
       )}
 
-      {/* 할일, 하객, 예산 탭 */}
+      {/* 할일 */}
       {tab === "tasks" && (
-        <div>{/* 1번 코드 할일 기능 + 2번 디자인 적용 */}</div>
+        <div style={{ background: "white", padding: "15px", borderRadius: "20px" }}>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ padding: "8px", borderRadius: "10px", marginRight: "5px" }}>
+            <option>스드메</option>
+            <option>웨딩홀</option>
+            <option>신혼여행</option>
+            <option>예물</option>
+            <option>혼수</option>
+          </select>
+          <input value={taskText} onChange={(e) => setTaskText(e.target.value)} placeholder="할 일 입력" style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", width: "60%", marginRight: "5px" }} />
+          <button onClick={() => { setTasks([...tasks, { text: taskText, category, done: false }]); setTaskText(""); }}>추가</button>
+
+          <div style={{ marginTop: "10px" }}>
+            {Object.entries(tasks.reduce((acc, t) => { acc[t.category] = acc[t.category] || []; acc[t.category].push(t); return acc; }, {})).map(([cat, list]) => (
+              <div key={cat} style={{ marginBottom: "10px" }}>
+                <b>{cat}</b>
+                {list.map((t, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0" }}>
+                    <span style={{ textDecoration: t.done ? "line-through" : "none" }}>{t.text}</span>
+                    <div>
+                      <button onClick={() => { let x = [...tasks]; x[i].done = !x[i].done; setTasks(x); }}>{t.done ? "완료" : "미완료"}</button>
+                      <button onClick={() => setTasks(tasks.filter((_, idx) => idx !== i))}>삭제</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
+
+      {/* 하객 */}
       {tab === "guests" && (
-        <div>{/* 1번 코드 하객 기능 + 2번 디자인 적용 */}</div>
+        <div>
+          <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+            {["신랑", "신부"].map(p => (
+              <button key={p} onClick={() => setGuestParent(p)} style={{ flex: 1, padding: "8px", borderRadius: "12px", border: "none", background: guestParent === p ? "#ff8fa3" : "#eee", color: guestParent === p ? "white" : "black" }}>{p}</button>
+            ))}
+          </div>
+          <input placeholder="카테고리" value={guestCategory} onChange={(e) => setGuestCategory(e.target.value)} style={{ padding: "5px", borderRadius: "8px", marginRight: "5px" }} />
+          <input placeholder="이름" value={guestName} onChange={(e) => setGuestName(e.target.value)} style={{ padding: "5px", borderRadius: "8px", marginRight: "5px" }} />
+          <button onClick={() => { setGuests([...guests, { parent: guestParent, category: guestCategory, name: guestName }]); setGuestName(""); setGuestCategory(""); }}>추가</button>
+          <input placeholder="검색" value={guestSearch} onChange={(e) => setGuestSearch(e.target.value)} style={{ marginTop: "10px", padding: "5px", borderRadius: "8px", width: "100%" }} />
+          <div style={{ marginTop: "10px", maxHeight: "250px", overflowY: "auto", background: "white", borderRadius: "15px", padding: "10px" }}>
+            {guests.filter(g => g.name.includes(guestSearch) || g.category.includes(guestSearch)).map((g, i) => (
+              <div key={i} style={{ padding: "5px", borderBottom: "1px solid #eee" }}><b>{g.parent} > {g.category}</b> : {g.name}</div>
+            ))}
+          </div>
+        </div>
       )}
+
+      {/* 예산 */}
       {tab === "budget" && (
-        <div>{/* 1번 코드 예산 기능 + 2번 디자인 적용 */}</div>
+        <div style={{ background: "white", padding: "15px", borderRadius: "20px" }}>
+          <h3>💰 예산: {totalBudget}원</h3>
+          <input placeholder="항목" value={budgetName} onChange={(e) => setBudgetName(e.target.value)} style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", marginRight: "5px" }} />
+          <input placeholder="금액" type="number" value={budgetCost} onChange={(e) => setBudgetCost(e.target.value)} style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", marginRight: "5px" }} />
+          <button onClick={() => { setBudgetItems([...budgetItems, { name: budgetName, cost: +budgetCost }]); setBudgetName(""); setBudgetCost(""); }}>추가</button>
+          <div style={{ marginTop: "10px" }}>
+            {budgetItems.map((b, i) => (<div key={i}>{b.name} - {b.cost}원</div>))}
+          </div>
+        </div>
       )}
 
       {/* 우측 하단 초대코드 + 버튼 */}
       <button onClick={() => { navigator.clipboard.writeText(coupleId); alert("초대 코드 복사됨: " + coupleId); }}
-        style={{ position: "fixed", bottom: "20px", right: "20px", background: "#ff8fa3", color: "#fff", border: "none", padding: "16px", borderRadius: "50%", fontSize: "20px", cursor: "pointer" }}>+</button>
-
-    </div> // App wrapper div 닫기
-  );
-} // App 함수 닫기
+        style={{ position: "fixed", bottom: "20px
