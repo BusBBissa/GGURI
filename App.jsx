@@ -102,16 +102,13 @@ function HomeTab({ coupleId }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
 
-  // LocalStorage 키
   const storageKey = `wedding_images_${coupleId}`;
 
-  // 초기 데이터 불러오기
+  // 데이터 불러오기
   useEffect(() => {
-    // LocalStorage에서 이미지 불러오기
     const saved = localStorage.getItem(storageKey);
     if (saved) setImages(JSON.parse(saved));
 
-    // Firestore에서 이벤트, 웨딩 날짜 불러오기
     const load = async () => {
       const snap = await getDoc(doc(db, "couples", coupleId));
       if (snap.exists()) {
@@ -123,17 +120,10 @@ function HomeTab({ coupleId }) {
     load();
   }, [coupleId]);
 
-  // LocalStorage에 이미지 저장
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(images));
-  }, [images]);
-
-  // Firebase에 이벤트/웨딩날짜 저장
-  const saveField = async (field, value) => {
-    await updateDoc(doc(db, "couples", coupleId), { [field]: value });
-  };
-  useEffect(() => { if(events.length) saveField("events", events); }, [events]);
-  useEffect(() => { if(weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
+  // 로컬 저장
+  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(images)); }, [images]);
+  useEffect(() => { if(events.length) updateDoc(doc(db,"couples",coupleId), {events}); }, [events]);
+  useEffect(() => { if(weddingDate) updateDoc(doc(db,"couples",coupleId), {weddingDate}); }, [weddingDate]);
 
   // 사진 슬라이드
   useEffect(() => {
@@ -142,22 +132,20 @@ function HomeTab({ coupleId }) {
     return () => clearInterval(interval);
   }, [images]);
 
-  // 이미지 업로드(LocalStorage용)
   const uploadImage = (file) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      setImages(prev => [...prev, reader.result]);
-    };
+    reader.onload = () => setImages(prev => [...prev, reader.result]);
     reader.readAsDataURL(file);
   };
 
-  // 달력용 변수
-  const baseDate = new Date();
-  baseDate.setMonth(baseDate.getMonth() + monthOffset);
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const dday = weddingDate ? Math.ceil((new Date(weddingDate) - new Date()) / (1000*60*60*24)) : null;
+  const dday = weddingDate ? Math.floor((new Date(weddingDate) - new Date()) / 86400000) : "?";
+
+  // 달력 계산
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const year = firstDay.getFullYear();
+  const month = firstDay.getMonth();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
 
   return (
     <div>
@@ -169,7 +157,10 @@ function HomeTab({ coupleId }) {
         </label>
         <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
           {images.map((img, idx)=>(
-            <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
+            <div key={idx} style={{position:"relative"}}>
+              <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
+              <button onClick={()=>setImages(prev=>prev.filter((_,i)=>i!==idx))} style={{position:"absolute", top:0, right:0, background:"red", color:"#fff", border:"none", borderRadius:"50%", width:"20px", height:"20px", cursor:"pointer"}}>×</button>
+            </div>
           ))}
         </div>
       </div>
@@ -183,7 +174,7 @@ function HomeTab({ coupleId }) {
 
       {/* D-day */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
-        <h2>D-{dday ?? "?"}</h2>
+        <h2>D-{dday}</h2>
         <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
       </div>
 
@@ -198,7 +189,11 @@ function HomeTab({ coupleId }) {
           {[...Array(daysInMonth)].map((_,i)=>{
             const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
             const hasEvent = events.find(e=>e.date===date);
-            return <div key={i} onClick={()=>setSelectedDate(date)} style={{padding:"12px", borderRadius:"10px", background:hasEvent?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer"}}>{i+1}</div>
+            return (
+              <div key={i} onClick={()=>setSelectedDate(date)} style={{padding:"12px", borderRadius:"10px", background:hasEvent?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer"}}>
+                {i+1}
+              </div>
+            );
           })}
         </div>
         {selectedDate && (
@@ -227,86 +222,88 @@ function TasksTab({ coupleId }) {
   // Firestore에서 불러오기
   useEffect(() => {
     const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
-      if (snap.exists()) setTasks(snap.data().tasks || []);
+      const snap = await getDoc(doc(db,"couples",coupleId));
+      if(snap.exists()) setTasks(snap.data().tasks || []);
     };
     load();
   }, [coupleId]);
 
   // Firestore에 저장
   useEffect(() => {
-    updateDoc(doc(db, "couples", coupleId), { tasks });
+    updateDoc(doc(db,"couples",coupleId), {tasks});
   }, [tasks, coupleId]);
 
-  // 카테고리별로 그룹화
-  const groupedTasks = tasks.reduce((acc, t) => {
-    if (!acc[t.category]) acc[t.category] = [];
+  // 완료 상태 토글
+  const toggleDone = (task) => {
+    setTasks(prev => prev.map(t => t===task ? {...t, done: !t.done} : t));
+  };
+
+  // 삭제
+  const deleteTask = (task) => {
+    setTasks(prev => prev.filter(t => t !== task));
+  };
+
+  // 카테고리별 그룹화
+  const grouped = tasks.reduce((acc, t) => {
+    acc[t.category] = acc[t.category] || [];
     acc[t.category].push(t);
     return acc;
   }, {});
 
   return (
-    <div style={{ padding: "15px" }}>
+    <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
       {/* 입력창 */}
-      <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap:"wrap" }}>
-        <input
-          placeholder="카테고리"
-          value={taskCategory}
-          onChange={e => setTaskCategory(e.target.value)}
-          style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", flex:"1 1 100px" }}
-        />
-        <input
-          placeholder="할 일 입력"
-          value={taskText}
-          onChange={e => setTaskText(e.target.value)}
-          style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", flex:"2 1 200px" }}
-        />
-        <button
-          onClick={() => {
-            if (!taskText || !taskCategory) return;
-            setTasks(prev => [...prev, { text: taskText, category: taskCategory, done: false }]);
-            setTaskText("");
-            setTaskCategory("");
-          }}
-          style={{ padding: "8px 15px", borderRadius: "12px", background: "#ff8fa3", color: "#fff", border: "none", cursor: "pointer" }}
-        >
-          ➕ 추가
-        </button>
+      <div style={{display:"flex", gap:"5px", marginBottom:"15px", flexWrap:"wrap"}}>
+        <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
+        <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
+        <button onClick={()=>{
+          if(!taskText || !taskCategory) return;
+          setTasks(prev => [...prev,{text:taskText,category:taskCategory,done:false}]);
+          setTaskText(""); setTaskCategory("");
+        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
       </div>
 
-      {/* 카테고리별 카드 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: "15px" }}>
-        {Object.entries(groupedTasks).map(([category, list]) => (
-          <div key={category} style={{ background: "#fff", padding: "12px", borderRadius: "15px", boxShadow: "0 3px 10px rgba(0,0,0,0.1)" }}>
-            <h4 style={{ marginBottom: "10px", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>{category}</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {list.map((t, idx) => (
-                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px", borderRadius: "10px", background: t.done ? "#d3ffd3" : "#ffe3e3" }}>
-                  <span style={{ textDecoration: t.done ? "line-through" : "none", flex:1 }}>{t.text}</span>
-                  <button
-                    onClick={() => setTasks(prev => prev.map(item => item === t ? { ...item, done: !item.done } : item))}
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: "12px",
-                      border: "none",
-                      background: t.done ? "#ff6f91" : "#6fff91",
-                      color: "#fff",
-                      cursor: "pointer",
-                      fontSize: "12px"
-                    }}
-                  >
-                    {t.done ? "완료" : "미완료"}
-                  </button>
-                </div>
-              ))}
-            </div>
+      {/* 카테고리별 그룹 표시 */}
+      {Object.entries(grouped).map(([cat, list]) => (
+        <div key={cat} style={{marginBottom:"15px"}}>
+          <b style={{display:"block", marginBottom:"5px"}}>{cat}</b>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:"10px"}}>
+            {list.map((t,i)=>(
+              <div key={i} style={{
+                padding:"10px",
+                borderRadius:"12px",
+                background:"#fff0f5",
+                display:"flex",
+                justifyContent:"space-between",
+                alignItems:"center",
+                cursor:"pointer",
+                boxShadow:"0 2px 5px rgba(0,0,0,0.05)"
+              }}>
+                <span onClick={()=>toggleDone(t)} style={{
+                  textDecoration: t.done ? "line-through" : "none",
+                  color: t.done ? "#888" : "#000",
+                  flex:1,
+                  marginRight:"5px"
+                }}>
+                  {t.text}
+                </span>
+                <button onClick={()=>deleteTask(t)} style={{
+                  background:"red",
+                  border:"none",
+                  color:"#fff",
+                  borderRadius:"6px",
+                  padding:"2px 6px",
+                  cursor:"pointer",
+                  fontSize:"12px"
+                }}>×</button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
-
 // ---------------- GuestsTab ----------------
 function GuestsTab({ coupleId }) {
   const [guests, setGuests] = useState([]);
