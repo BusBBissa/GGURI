@@ -308,86 +308,96 @@ function TasksTab({ coupleId }) {
 function GuestsTab({ coupleId }) {
   const [guests, setGuests] = useState([]);
   const [guestName, setGuestName] = useState("");
-  const [guestParent, setGuestParent] = useState("신랑");
   const [guestCategory, setGuestCategory] = useState("");
 
   // Firestore에서 불러오기
   useEffect(() => {
-    if (!coupleId) return;
     const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
-      if (snap.exists()) setGuests(snap.data().guests || []);
+      const snap = await getDoc(doc(db,"couples",coupleId));
+      if(snap.exists()) setGuests(snap.data().guests || []);
     };
     load();
   }, [coupleId]);
 
   // Firestore에 저장
   useEffect(() => {
-    if (!coupleId) return;
-    updateDoc(doc(db, "couples", coupleId), { guests });
+    updateDoc(doc(db,"couples",coupleId), {guests});
   }, [guests, coupleId]);
 
-  // 상태 토글 순서
-  const statusOrder = ["미정", "참석예정", "불참"];
+  // 상태 토글: 참석예정 <-> 미정
   const toggleStatus = (guest) => {
-    setGuests(prev =>
-      prev.map(g =>
-        g === guest ? { ...g, status: statusOrder[(statusOrder.indexOf(g.status || "미정") + 1) % statusOrder.length] } : g
-      )
-    );
+    setGuests(prev => prev.map(g => g === guest ? {...g, status: g.status==="참석예정" ? "미정" : "참석예정"} : g));
   };
 
-  // 신랑 / 신부로 분류
+  // 삭제
+  const deleteGuest = (guest) => {
+    setGuests(prev => prev.filter(g => g !== guest));
+  };
+
+  // 신랑/신부, 카테고리별 그룹화
   const grouped = { 신랑: {}, 신부: {} };
   guests.forEach(g => {
-    const parentGroup = grouped[g.parent];
-    if (!parentGroup[g.category]) parentGroup[g.category] = [];
-    parentGroup[g.category].push(g);
+    const side = g.parent || "신랑";
+    grouped[side][g.category] = grouped[side][g.category] || [];
+    grouped[side][g.category].push(g);
   });
 
-  const handleAdd = () => {
-    if (!guestName || !guestCategory) return;
-    setGuests(prev => [...prev, { name: guestName, category: guestCategory, parent: guestParent, status: "미정" }]);
-    setGuestName(""); setGuestCategory(""); setGuestParent("신랑");
-  };
-
   return (
-    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+    <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
       {/* 입력창 */}
-      <div style={{ flexBasis: "100%", display: "flex", gap: "5px", marginBottom: "15px" }}>
-        <select value={guestParent} onChange={e=>setGuestParent(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}>
-          <option>신랑</option>
-          <option>신부</option>
-        </select>
-        <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
+      <div style={{display:"flex", gap:"5px", marginBottom:"15px", flexWrap:"wrap"}}>
         <input placeholder="이름" value={guestName} onChange={e=>setGuestName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
-        <button onClick={handleAdd} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+        <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
+        <button onClick={()=>{
+          if(!guestName || !guestCategory) return;
+          setGuests(prev => [...prev,{name:guestName, category:guestCategory, parent:"신랑", status:"참석예정"}]);
+          setGuestName(""); setGuestCategory("");
+        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
       </div>
 
-      {/* 신랑 / 신부 컬럼 */}
-      {["신랑","신부"].map(parent => (
-        <div key={parent} style={{flex:1, minWidth:"250px"}}>
-          <h3 style={{textAlign:"center", marginBottom:"10px"}}>{parent}</h3>
-          {Object.entries(grouped[parent]).map(([cat, list]) => (
-            <div key={cat} style={{marginBottom:"10px"}}>
-              <b>{cat}</b>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginTop:"5px" }}>
-                {list.map((g,i) => (
-                  <div key={i} onClick={()=>toggleStatus(g)}
-                    style={{
-                      padding:"8px", borderRadius:"10px",
-                      background: g.status==="참석예정"?"#c3f3c3":g.status==="불참"?"#f3c3c3":"#f9f9f9",
-                      textAlign:"center", cursor:"pointer",
-                      boxShadow:"0 1px 3px rgba(0,0,0,0.1)"
+      {/* 신랑 / 신부 영역 */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px"}}>
+        {["신랑","신부"].map(side => (
+          <div key={side}>
+            <h3 style={{textAlign:"center", marginBottom:"10px"}}>{side}</h3>
+            {Object.entries(grouped[side]).map(([cat, list]) => (
+              <div key={cat} style={{marginBottom:"15px"}}>
+                <b style={{display:"block", marginBottom:"5px"}}>{cat}</b>
+                <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"10px"}}>
+                  {list.map((g,i)=>(
+                    <div key={i} style={{
+                      padding:"10px",
+                      borderRadius:"12px",
+                      background:"#fff0f5",
+                      display:"flex",
+                      justifyContent:"space-between",
+                      alignItems:"center",
+                      boxShadow:"0 2px 5px rgba(0,0,0,0.05)",
+                      cursor:"pointer"
                     }}>
-                    {g.name} ({g.status})
-                  </div>
-                ))}
+                      <span onClick={()=>toggleStatus(g)} style={{
+                        flex:1,
+                        marginRight:"5px",
+                        color: g.status==="참석예정" ? "#000" : "#888",
+                        textDecoration: g.status==="참석예정" ? "none" : "line-through"
+                      }}>{g.name} ({g.status})</span>
+                      <button onClick={()=>deleteGuest(g)} style={{
+                        background:"red",
+                        border:"none",
+                        color:"#fff",
+                        borderRadius:"6px",
+                        padding:"2px 6px",
+                        cursor:"pointer",
+                        fontSize:"12px"
+                      }}>×</button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ))}
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -395,7 +405,7 @@ function GuestsTab({ coupleId }) {
 function BudgetTab({ coupleId }) {
   const [budgetItems, setBudgetItems] = useState([]);
   const [budgetName, setBudgetName] = useState("");
-  const [budgetCost, setBudgetCost] = useState("");  
+  const [budgetCost, setBudgetCost] = useState("");
 
   // Firestore에서 불러오기
   useEffect(() => {
@@ -413,61 +423,54 @@ function BudgetTab({ coupleId }) {
     updateDoc(doc(db, "couples", coupleId), { budgetItems });
   }, [budgetItems, coupleId]);
 
-  const handleAdd = () => {
-    if (!budgetName || !budgetCost) return;
-    setBudgetItems(prev => [...prev, { name: budgetName, cost: Number(budgetCost) }]);
-    setBudgetName("");
-    setBudgetCost("");
+  // 삭제
+  const deleteItem = (item) => {
+    setBudgetItems(prev => prev.filter(b => b !== item));
   };
 
+  // 총액
   const totalBudget = budgetItems.reduce((acc, b) => acc + Number(b.cost || 0), 0);
 
   return (
-    <div style={{ padding: "15px" }}>
+    <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
       {/* 입력창 */}
-      <div style={{ display: "flex", gap: "5px", marginBottom: "10px" }}>
-        <input
-          placeholder="항목명"
-          value={budgetName}
-          onChange={e => setBudgetName(e.target.value)}
-          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex: 2 }}
-        />
-        <input
-          placeholder="금액"
-          type="number"
-          value={budgetCost}
-          onChange={e => setBudgetCost(e.target.value)}
-          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex: 1 }}
-        />
-        <button
-          onClick={handleAdd}
-          style={{ padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer" }}
-        >
-          ➕ 추가
-        </button>
+      <div style={{display:"flex", gap:"5px", marginBottom:"15px", flexWrap:"wrap"}}>
+        <input placeholder="항목명" value={budgetName} onChange={e=>setBudgetName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
+        <input placeholder="금액" type="number" value={budgetCost} onChange={e=>setBudgetCost(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
+        <button onClick={()=>{
+          if(!budgetName || !budgetCost) return;
+          setBudgetItems(prev => [...prev,{name:budgetName, cost:Number(budgetCost)}]);
+          setBudgetName(""); setBudgetCost("");
+        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
       </div>
 
       {/* 총액 */}
-      <div style={{ marginBottom:"10px", fontWeight:"bold" }}>
+      <div style={{marginBottom:"15px", fontWeight:"bold"}}>
         총 예산: {totalBudget.toLocaleString()}원
       </div>
 
-      {/* 2단 레이아웃 리스트 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-        {budgetItems.map((b, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "8px 10px",
-              borderRadius: "12px",
-              background: "#fff",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.05)"
-            }}
-          >
-            <span style={{ fontWeight: "500" }}>{b.name}</span>
-            <span style={{ fontWeight: "500" }}>{Number(b.cost).toLocaleString()}원</span>
+      {/* 2단 카드형 리스트 */}
+      <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"10px"}}>
+        {budgetItems.map((b,i)=>(
+          <div key={i} style={{
+            padding:"10px",
+            borderRadius:"12px",
+            background:"#fff0f5",
+            display:"flex",
+            justifyContent:"space-between",
+            alignItems:"center",
+            boxShadow:"0 2px 5px rgba(0,0,0,0.05)"
+          }}>
+            <span>{b.name} - {Number(b.cost).toLocaleString()}원</span>
+            <button onClick={()=>deleteItem(b)} style={{
+              background:"red",
+              border:"none",
+              color:"#fff",
+              borderRadius:"6px",
+              padding:"2px 6px",
+              cursor:"pointer",
+              fontSize:"12px"
+            }}>×</button>
           </div>
         ))}
       </div>
