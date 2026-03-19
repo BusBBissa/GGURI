@@ -93,7 +93,6 @@ function TabBar({ tab, setTab, logout }) {
 }
 
 // ---------------- HomeTab ----------------
-
 function HomeTab({ coupleId }) {
   const [images, setImages] = useState([]);
   const [currentImage, setCurrentImage] = useState(0);
@@ -103,80 +102,59 @@ function HomeTab({ coupleId }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
 
-  // LocalStorage 키
-  const imagesKey = `wedding_images_${coupleId}`;
-  const eventsKey = `wedding_events_${coupleId}`;
-  const dateKey = `wedding_date_${coupleId}`;
+  const storageKey = `wedding_images_${coupleId}`;
 
-  // ---------------- 초기 데이터 불러오기 ----------------
+  // 불러오기
   useEffect(() => {
-    const savedImages = localStorage.getItem(imagesKey);
-    if (savedImages) setImages(JSON.parse(savedImages));
-
-    const savedEvents = localStorage.getItem(eventsKey);
-    if (savedEvents) setEvents(JSON.parse(savedEvents));
-
-    const savedDate = localStorage.getItem(dateKey);
-    if (savedDate) setWeddingDate(savedDate);
+    const saved = localStorage.getItem(storageKey);
+    if (saved) setImages(JSON.parse(saved));
 
     const load = async () => {
       const snap = await getDoc(doc(db, "couples", coupleId));
       if (snap.exists()) {
         const d = snap.data();
-        setImages(d.images || JSON.parse(savedImages) || []);
-        setEvents(d.events || JSON.parse(savedEvents) || []);
-        setWeddingDate(d.weddingDate || savedDate || "");
+        setEvents(d.events || []);
+        setWeddingDate(d.weddingDate || "");
       }
     };
     load();
   }, [coupleId]);
 
-  // ---------------- 상태 변경 시 저장 ----------------
+  // LocalStorage에 저장
   useEffect(() => {
-    localStorage.setItem(imagesKey, JSON.stringify(images));
-    updateDoc(doc(db,"couples",coupleId), { images });
-  }, [images, coupleId]);
+    localStorage.setItem(storageKey, JSON.stringify(images));
+  }, [images]);
 
-  useEffect(() => {
-    localStorage.setItem(eventsKey, JSON.stringify(events));
-    updateDoc(doc(db,"couples",coupleId), { events });
-  }, [events, coupleId]);
+  const saveField = async (field, value) => { 
+    await updateDoc(doc(db, "couples", coupleId), { [field]: value }); 
+  };
 
-  useEffect(() => {
-    localStorage.setItem(dateKey, weddingDate);
-    updateDoc(doc(db,"couples",coupleId), { weddingDate });
-  }, [weddingDate, coupleId]);
+  useEffect(() => { if(events.length) saveField("events", events); }, [events]);
+  useEffect(() => { if(weddingDate) saveField("weddingDate", weddingDate); }, [weddingDate]);
 
-  // ---------------- 사진 슬라이드 ----------------
+  // 사진 슬라이드
   useEffect(() => {
     if(images.length < 2) return;
-    const interval = setInterval(() => setCurrentImage(prev => (prev + 1) % images.length), 3000);
+    const interval = setInterval(() => setCurrentImage((prev) => (prev + 1) % images.length), 3000);
     return () => clearInterval(interval);
   }, [images]);
 
-  // ---------------- 이미지 업로드 ----------------
   const uploadImage = (file) => {
     const reader = new FileReader();
-    reader.onload = () => setImages(prev => [...prev, reader.result]);
+    reader.onload = () => {
+      setImages(prev => [...prev, reader.result]);
+    };
     reader.readAsDataURL(file);
-  };
-
-  // ---------------- 이미지 삭제 ----------------
-  const deleteImage = (idx) => setImages(prev => prev.filter((_,i)=>i!==idx));
-
-  // ---------------- 이벤트 추가 ----------------
-  const addEvent = () => {
-    if(!eventText || !selectedDate) return;
-    setEvents(prev => [...prev, { text: eventText, date: selectedDate }]);
-    setEventText("");
   };
 
   // ---------------- 달력 계산 ----------------
   const today = new Date();
-  const displayDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-  const year = displayDate.getFullYear();
-  const month = displayDate.getMonth();
-  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const firstDay = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const year = firstDay.getFullYear();
+  const month = firstDay.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const weekdays = ["일","월","화","수","목","금","토"];
 
   return (
     <div>
@@ -188,10 +166,7 @@ function HomeTab({ coupleId }) {
         </label>
         <div style={{display:"flex", gap:"5px", marginTop:"10px", flexWrap:"wrap"}}>
           {images.map((img, idx)=>(
-            <div key={idx} style={{position:"relative"}}>
-              <img src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
-              <button onClick={()=>deleteImage(idx)} style={{position:"absolute", top:"-5px", right:"-5px", background:"#ffb3c1", border:"none", borderRadius:"50%", width:"20px", height:"20px", cursor:"pointer"}}>×</button>
-            </div>
+            <img key={idx} src={img} onClick={()=>setCurrentImage(idx)} style={{width:"80px", height:"80px", objectFit:"cover", borderRadius:"8px", border: idx===currentImage?"2px solid #ff8fa3":"1px solid #ccc", cursor:"pointer"}}/>
           ))}
         </div>
       </div>
@@ -205,7 +180,7 @@ function HomeTab({ coupleId }) {
 
       {/* D-day */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
-        <h2>D-{weddingDate ? Math.ceil((new Date(weddingDate)-today)/(1000*60*60*24)) : "?"}</h2>
+        <h2>D-{weddingDate ? Math.floor((new Date(weddingDate)-new Date())/(1000*60*60*24)) : "?"}</h2>
         <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
       </div>
 
@@ -217,31 +192,31 @@ function HomeTab({ coupleId }) {
           <button onClick={()=>setMonthOffset(monthOffset+1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>다음달 ▶</button>
         </div>
 
+        {/* 요일 */}
+        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px", marginBottom:"5px", fontWeight:"bold", textAlign:"center"}}>
+          {weekdays.map(d => <div key={d}>{d}</div>)}
+        </div>
+
+        {/* 날짜 */}
         <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
           {[...Array(daysInMonth)].map((_,i)=>{
             const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
-            const dayEvents = events.filter(e=>e.date===date);
-            return (
-              <div key={i} onClick={()=>setSelectedDate(date)} style={{padding:"12px", borderRadius:"10px", background:dayEvents.length?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer"}}>
-                {i+1}
-              </div>
-            )
+            const hasEvent = events.find(e=>e.date===date);
+            return <div key={i} onClick={()=>setSelectedDate(date)} style={{padding:"10px", borderRadius:"10px", background:hasEvent?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer"}}>{i+1}</div>
           })}
         </div>
 
+        {/* 선택된 날짜 이벤트 */}
         {selectedDate && (
           <div style={{marginTop:"10px"}}>
             <h4>{selectedDate}</h4>
-            {events.filter(e=>e.date===selectedDate).map((e,i)=>(
-              <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0", background:"#fff", borderRadius:"8px", boxShadow:"0 1px 3px rgba(0,0,0,0.1)", marginBottom:"3px"}}>
-                <span>{e.text}</span>
-                <button onClick={()=>setEvents(prev => prev.filter(ev=>ev!==e))} style={{padding:"2px 6px", borderRadius:"6px", background:"#ffb3c1", border:"none", cursor:"pointer"}}>❌</button>
-              </div>
-            ))}
-            <div style={{display:"flex", gap:"5px", marginTop:"5px"}}>
-              <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
-              <button onClick={addEvent} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
-            </div>
+            {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
+            <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+            <button onClick={()=>{
+              if(!eventText) return;
+              setEvents(prev => [...prev,{text:eventText,date:selectedDate}]);
+              setEventText("");
+            }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
           </div>
         )}
       </div>
