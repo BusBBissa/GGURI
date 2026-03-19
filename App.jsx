@@ -168,7 +168,39 @@ function HomeTab({ coupleId }) {
         </div>
       )}
 
-      {/* 이하 D-day, 달력 JSX 동일 */}
+      {/* D-day */}
+      <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
+        <h2>D-{dday ?? "?"}</h2>
+        <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
+      </div>
+
+      {/* 달력 */}
+      <div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
+        <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
+          <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
+          <h3>{year}년 {month+1}월</h3>
+          <button onClick={()=>setMonthOffset(monthOffset+1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>다음달 ▶</button>
+        </div>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
+          {[...Array(daysInMonth)].map((_,i)=>{
+            const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+            const hasEvent = events.find(e=>e.date===date);
+            return <div key={i} onClick={()=>setSelectedDate(date)} style={{padding:"12px", borderRadius:"10px", background:hasEvent?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer"}}>{i+1}</div>
+          })}
+        </div>
+        {selectedDate && (
+          <div style={{marginTop:"10px"}}>
+            <h4>{selectedDate}</h4>
+            {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
+            <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+            <button onClick={()=>{
+              if(!eventText) return;
+              setEvents(prev => [...prev,{text:eventText,date:selectedDate}]);
+              setEventText("");
+            }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
