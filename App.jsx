@@ -144,6 +144,7 @@ function HomeTab({ coupleId }) {
 
   return (
     <div>
+      {/* 사진 업로드 */}
       <div style={{marginBottom:"20px"}}>
         <label style={{display:"inline-block", padding:"10px 20px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", cursor:"pointer"}}>
           사진 추가
@@ -156,17 +157,20 @@ function HomeTab({ coupleId }) {
         </div>
       </div>
 
+      {/* 사진 슬라이드 */}
       {images.length>0 && (
         <div style={{width:"100%", maxHeight:"50vh", borderRadius:"20px", overflow:"hidden", marginBottom:"20px", display:"flex", justifyContent:"center", alignItems:"center", background:"#fff"}}>
           <img src={images[currentImage]} style={{maxWidth:"100%", maxHeight:"100%", objectFit:"contain"}} />
         </div>
       )}
 
+      {/* D-day */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px"}}>
         <h2>D-{dday ?? "?"}</h2>
         <input type="date" value={weddingDate} onChange={e=>setWeddingDate(e.target.value)} style={{padding:"10px", borderRadius:"12px", border:"1px solid #ddd", marginTop:"10px"}}/>
       </div>
 
+      {/* 달력 */}
       <div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
         <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
           <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
@@ -277,6 +281,72 @@ function GuestsTab({ coupleId }) {
 function BudgetTab({ coupleId }) {
   const [budgetItems, setBudgetItems] = useState([]);
   const [budgetName, setBudgetName] = useState("");
-  const [budgetCost, setBudgetCost] = useState("");
+  
 
-  useEffect(() => { const load = async () =>
+  // Firestore에서 불러오기
+  useEffect(() => {
+    if (!coupleId) return;
+    const load = async () => {
+      const snap = await getDoc(doc(db, "couples", coupleId));
+      if (snap.exists()) setBudgetItems(snap.data().budgetItems || []);
+    };
+    load();
+  }, [coupleId]);
+
+  // Firestore에 저장
+  useEffect(() => {
+    if (!coupleId) return;
+    updateDoc(doc(db, "couples", coupleId), { budgetItems });
+  }, [budgetItems, coupleId]);
+
+  const handleAdd = () => {
+    if (!budgetName || !budgetCost) return;
+    setBudgetItems(prev => [...prev, { name: budgetName, cost: Number(budgetCost) }]);
+    setBudgetName("");
+    setBudgetCost("");
+  };
+
+  const totalBudget = budgetItems.reduce((acc, b) => acc + Number(b.cost || 0), 0);
+
+  return (
+    <div style={{ background: "white", padding: "15px", borderRadius: "20px" }}>
+      {/* 입력창 */}
+      <div style={{ display: "flex", gap: "5px", marginBottom: "10px" }}>
+        <input
+          placeholder="항목명"
+          value={budgetName}
+          onChange={e => setBudgetName(e.target.value)}
+          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd" }}
+        />
+        <input
+          placeholder="금액"
+          type="number"
+          value={budgetCost}
+          onChange={e => setBudgetCost(e.target.value)}
+          style={{ padding:"8px", borderRadius:"10px", border:"1px solid #ddd" }}
+        />
+        <button
+          onClick={handleAdd}
+          style={{ padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer" }}
+        >
+          ➕ 추가
+        </button>
+      </div>
+
+      {/* 총액 */}
+      <div style={{ marginBottom:"10px", fontWeight:"bold" }}>
+        총 예산: {totalBudget.toLocaleString()}원
+      </div>
+
+      {/* 리스트 */}
+      <div>
+        {budgetItems.map((b, i) => (
+          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #eee" }}>
+            <span>{b.name}</span>
+            <span>{Number(b.cost).toLocaleString()}원</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
