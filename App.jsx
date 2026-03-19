@@ -140,12 +140,24 @@ function HomeTab({ coupleId }) {
   }, [images]);
 
   const uploadImage = (file) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImages(prev => [...prev, reader.result]);
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = e => {
+    img.src = e.target.result;
+    img.onload = () => {
+      // 최대 너비 800px, 비율 유지
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, 800 / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.8); // 용량 줄이기
+      setImages(prev => [...prev, resizedDataUrl]);
     };
-    reader.readAsDataURL(file);
   };
+  reader.readAsDataURL(file);
+};
 
   // ---------------- 달력 계산 ----------------
   const today = new Date();
@@ -185,41 +197,59 @@ function HomeTab({ coupleId }) {
       </div>
 
       {/* 달력 */}
-      <div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
-        <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
-          <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
-          <h3>{year}년 {month+1}월</h3>
-          <button onClick={()=>setMonthOffset(monthOffset+1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>다음달 ▶</button>
-        </div>
+<div style={{background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px"}}>
+  {/* 이전/다음 달 버튼 */}
+  <div style={{display:"flex", justifyContent:"space-between", marginBottom:"10px"}}>
+    <button onClick={()=>setMonthOffset(monthOffset-1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>◀ 이전달</button>
+    <h3>{year}년 {month+1}월</h3>
+    <button onClick={()=>setMonthOffset(monthOffset+1)} style={{background:"#ffccd5", border:"none", borderRadius:"12px", padding:"5px 10px", cursor:"pointer"}}>다음달 ▶</button>
+  </div>
 
-        {/* 요일 */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px", marginBottom:"5px", fontWeight:"bold", textAlign:"center"}}>
-          {weekdays.map(d => <div key={d}>{d}</div>)}
-        </div>
+  {/* 요일 */}
+  <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:"5px", textAlign:"center", fontWeight:"bold"}}>
+    {["일","월","화","수","목","금","토"].map((d,i)=>(
+      <div key={i} style={{padding:"5px", color: i===0?"red":i===6?"blue":"black"}}>{d}</div>
+    ))}
+  </div>
 
-        {/* 날짜 */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
-          {[...Array(daysInMonth)].map((_,i)=>{
-            const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
-            const hasEvent = events.find(e=>e.date===date);
-            return <div key={i} onClick={()=>setSelectedDate(date)} style={{padding:"10px", borderRadius:"10px", background:hasEvent?"#ffccd5":"#f9f9f9", textAlign:"center", cursor:"pointer"}}>{i+1}</div>
-          })}
+  {/* 날짜 */}
+  <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px"}}>
+    {Array(firstDayOfMonth).fill(null).map((_,i)=>(
+      <div key={"blank"+i}></div>
+    ))}
+    {Array(daysInMonth).fill(null).map((_,i)=>{
+      const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+      const hasEvent = events.find(e=>e.date===date);
+      return (
+        <div key={i} onClick={()=>setSelectedDate(date)} 
+          style={{
+            padding:"12px",
+            borderRadius:"10px",
+            background: hasEvent ? "#ffccd5" : "#f9f9f9",
+            textAlign:"center",
+            cursor:"pointer"
+          }}
+        >
+          {i+1}
         </div>
+      )
+    })}
+  </div>
 
-        {/* 선택된 날짜 이벤트 */}
-        {selectedDate && (
-          <div style={{marginTop:"10px"}}>
-            <h4>{selectedDate}</h4>
-            {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
-            <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
-            <button onClick={()=>{
-              if(!eventText) return;
-              setEvents(prev => [...prev,{text:eventText,date:selectedDate}]);
-              setEventText("");
-            }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
-          </div>
-        )}
-      </div>
+  {/* 선택 날짜 이벤트 */}
+  {selectedDate && (
+    <div style={{marginTop:"10px"}}>
+      <h4>{selectedDate}</h4>
+      {events.filter(e=>e.date===selectedDate).map((e,i)=><div key={i}>{e.text}</div>)}
+      <input placeholder="일정" value={eventText} onChange={e=>setEventText(e.target.value)} style={{padding:"5px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
+      <button onClick={()=>{
+        if(!eventText) return;
+        setEvents(prev => [...prev,{text:eventText,date:selectedDate}]);
+        setEventText("");
+      }} style={{padding:"5px 12px", borderRadius:"10px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>추가</button>
+    </div>
+  )}
+</div>
     </div>
   );
 }
