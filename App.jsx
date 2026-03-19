@@ -224,29 +224,82 @@ function TasksTab({ coupleId }) {
   const [taskText, setTaskText] = useState("");
   const [taskCategory, setTaskCategory] = useState("");
 
-  useEffect(() => { const load = async () => { const snap = await getDoc(doc(db,"couples",coupleId)); if(snap.exists()) setTasks(snap.data().tasks || []); }; load(); }, [coupleId]);
-  useEffect(() => { updateDoc(doc(db,"couples",coupleId), {tasks}); }, [tasks]);
+  // Firestore에서 불러오기
+  useEffect(() => {
+    const load = async () => {
+      const snap = await getDoc(doc(db, "couples", coupleId));
+      if (snap.exists()) setTasks(snap.data().tasks || []);
+    };
+    load();
+  }, [coupleId]);
+
+  // Firestore에 저장
+  useEffect(() => {
+    updateDoc(doc(db, "couples", coupleId), { tasks });
+  }, [tasks, coupleId]);
+
+  // 카테고리별로 그룹화
+  const groupedTasks = tasks.reduce((acc, t) => {
+    if (!acc[t.category]) acc[t.category] = [];
+    acc[t.category].push(t);
+    return acc;
+  }, {});
 
   return (
-    <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-      <input placeholder="카테고리" value={taskCategory} onChange={e=>setTaskCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
-      <input placeholder="할 일 입력" value={taskText} onChange={e=>setTaskText(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"60%", marginRight:"5px"}}/>
-      <button onClick={()=>{
-        if(!taskText || !taskCategory) return;
-        setTasks(prev => [...prev,{text:taskText,category:taskCategory,done:false}]);
-        setTaskText(""); setTaskCategory("");
-      }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+    <div style={{ padding: "15px" }}>
+      {/* 입력창 */}
+      <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap:"wrap" }}>
+        <input
+          placeholder="카테고리"
+          value={taskCategory}
+          onChange={e => setTaskCategory(e.target.value)}
+          style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", flex:"1 1 100px" }}
+        />
+        <input
+          placeholder="할 일 입력"
+          value={taskText}
+          onChange={e => setTaskText(e.target.value)}
+          style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd", flex:"2 1 200px" }}
+        />
+        <button
+          onClick={() => {
+            if (!taskText || !taskCategory) return;
+            setTasks(prev => [...prev, { text: taskText, category: taskCategory, done: false }]);
+            setTaskText("");
+            setTaskCategory("");
+          }}
+          style={{ padding: "8px 15px", borderRadius: "12px", background: "#ff8fa3", color: "#fff", border: "none", cursor: "pointer" }}
+        >
+          ➕ 추가
+        </button>
+      </div>
 
-      <div style={{marginTop:"10px"}}>
-        {Object.entries(tasks.reduce((acc,t)=>{acc[t.category]=acc[t.category]||[]; acc[t.category].push(t); return acc;},{})).map(([cat,list])=>(
-          <div key={cat} style={{marginBottom:"10px"}}>
-            <b>{cat}</b>
-            {list.map((t,i)=>(
-              <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0"}}>
-                <span style={{textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
-                <button onClick={()=>{ setTasks(prev => prev.map(item => item===t ? {...item, done:!item.done} : item)); }}>{t.done?"완료":"미완료"}</button>
-              </div>
-            ))}
+      {/* 카테고리별 카드 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: "15px" }}>
+        {Object.entries(groupedTasks).map(([category, list]) => (
+          <div key={category} style={{ background: "#fff", padding: "12px", borderRadius: "15px", boxShadow: "0 3px 10px rgba(0,0,0,0.1)" }}>
+            <h4 style={{ marginBottom: "10px", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>{category}</h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {list.map((t, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px", borderRadius: "10px", background: t.done ? "#d3ffd3" : "#ffe3e3" }}>
+                  <span style={{ textDecoration: t.done ? "line-through" : "none", flex:1 }}>{t.text}</span>
+                  <button
+                    onClick={() => setTasks(prev => prev.map(item => item === t ? { ...item, done: !item.done } : item))}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "12px",
+                      border: "none",
+                      background: t.done ? "#ff6f91" : "#6fff91",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontSize: "12px"
+                    }}
+                  >
+                    {t.done ? "완료" : "미완료"}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -260,36 +313,111 @@ function GuestsTab({ coupleId }) {
   const [guestName, setGuestName] = useState("");
   const [guestParent, setGuestParent] = useState("신랑");
   const [guestCategory, setGuestCategory] = useState("");
-  const [guestSearch, setGuestSearch] = useState("");
 
-  useEffect(() => { const load = async () => { const snap = await getDoc(doc(db,"couples",coupleId)); if(snap.exists()) setGuests(snap.data().guests || []); }; load(); }, [coupleId]);
-  useEffect(() => { updateDoc(doc(db,"couples",coupleId), {guests}); }, [guests]);
+  // Firestore에서 불러오기
+  useEffect(() => {
+    const load = async () => {
+      const snap = await getDoc(doc(db, "couples", coupleId));
+      if (snap.exists()) setGuests(snap.data().guests || []);
+    };
+    load();
+  }, [coupleId]);
 
-  const filtered = guests.filter(g=>g.name.includes(guestSearch) || g.category.includes(guestSearch));
+  // Firestore에 저장
+  useEffect(() => {
+    updateDoc(doc(db, "couples", coupleId), { guests });
+  }, [guests, coupleId]);
+
+  // 신랑/신부별 그룹화 -> 카테고리별 정리
+  const grouped = guests.reduce((acc, g) => {
+    if (!acc[g.parent]) acc[g.parent] = {};
+    if (!acc[g.parent][g.category]) acc[g.parent][g.category] = [];
+    acc[g.parent][g.category].push(g);
+    return acc;
+  }, {});
+
+  const handleAdd = () => {
+    if (!guestName || !guestCategory) return;
+    setGuests(prev => [...prev, { name: guestName, parent: guestParent, category: guestCategory, done: false }]);
+    setGuestName("");
+    setGuestCategory("");
+    setGuestParent("신랑");
+  };
 
   return (
-    <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
-      <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
-        <select value={guestParent} onChange={e=>setGuestParent(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}>
-          <option>신랑</option>
-          <option>신부</option>
-        </select>
-        <input placeholder="카테고리" value={guestCategory} onChange={e=>setGuestCategory(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
-        <input placeholder="이름" value={guestName} onChange={e=>setGuestName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
-        <button onClick={()=>{
-          if(!guestName || !guestCategory) return;
-          setGuests(prev => [...prev,{name:guestName,parent:guestParent,category:guestCategory}]);
-          setGuestName(""); setGuestCategory(""); setGuestParent("신랑");
-        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
-      </div>
-      <input placeholder="검색" value={guestSearch} onChange={e=>setGuestSearch(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"100%", marginBottom:"10px"}}/>
-      <div>
-        {filtered.map((g,i)=>(
-          <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #eee"}}>
-            <span>{g.parent} - {g.category} - {g.name}</span>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", padding: "15px" }}>
+      {["신랑", "신부"].map(parent => (
+        <div key={parent} style={{ background: "#fff", padding: "12px", borderRadius: "15px", boxShadow: "0 3px 10px rgba(0,0,0,0.1)" }}>
+          <h3 style={{ marginBottom: "10px", borderBottom: "1px solid #eee", paddingBottom: "5px" }}>{parent}</h3>
+
+          {/* 입력 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "10px" }}>
+            <input
+              placeholder="카테고리"
+              value={guestCategory}
+              onChange={e => setGuestCategory(e.target.value)}
+              style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd" }}
+            />
+            <input
+              placeholder="이름"
+              value={guestName}
+              onChange={e => setGuestName(e.target.value)}
+              style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd" }}
+            />
+            <select value={guestParent} onChange={e => setGuestParent(e.target.value)} style={{ padding: "8px", borderRadius: "10px", border: "1px solid #ddd" }}>
+              <option>신랑</option>
+              <option>신부</option>
+            </select>
+            <button
+              onClick={handleAdd}
+              style={{ padding: "8px 15px", borderRadius: "12px", background: "#ff8fa3", color: "#fff", border: "none", cursor: "pointer" }}
+            >
+              ➕ 추가
+            </button>
           </div>
-        ))}
-      </div>
+
+          {/* 카테고리별 리스트 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {grouped[parent] &&
+              Object.entries(grouped[parent]).map(([category, list]) => (
+                <div key={category}>
+                  <h4 style={{ marginBottom: "5px", fontWeight: "bold" }}>{category}</h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {list.map((g, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "6px 10px",
+                          borderRadius: "10px",
+                          background: g.done ? "#d3ffd3" : "#ffe3e3",
+                        }}
+                      >
+                        <span style={{ textDecoration: g.done ? "line-through" : "none" }}>{g.name}</span>
+                        <button
+                          onClick={() => setGuests(prev => prev.map(item => item === g ? { ...item, done: !item.done } : item))}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "12px",
+                            border: "none",
+                            background: g.done ? "#ff6f91" : "#6fff91",
+                            color: "#fff",
+                            cursor: "pointer",
+                            fontSize: "12px"
+                          }}
+                        >
+                          {g.done ? "완료" : "미완료"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
