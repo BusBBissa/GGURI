@@ -29,17 +29,10 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [eventText, setEventText] = useState("");
   const [eventDate, setEventDate] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
 
-  const [budgetItems, setBudgetItems] = useState([]);
-  const [budgetName, setBudgetName] = useState("");
-  const [budgetCost, setBudgetCost] = useState("");
-
-  const [guests, setGuests] = useState([]);
-  const [guestName, setGuestName] = useState("");
-
+  const [budget, setBudget] = useState(0);
+  const [guests, setGuests] = useState(0);
   const [weddingDate, setWeddingDate] = useState("");
-  const [monthOffset, setMonthOffset] = useState(0);
 
   useEffect(() => {
     onAuthStateChanged(auth, (u) => u && setUser(u));
@@ -54,8 +47,8 @@ export default function App() {
         setImages(d.images || []);
         setTasks(d.tasks || []);
         setEvents(d.events || []);
-        setBudgetItems(d.budgetItems || []);
-        setGuests(d.guests || []);
+        setBudget(d.budget || 0);
+        setGuests(d.guests || 0);
         setWeddingDate(d.weddingDate || "");
       }
     };
@@ -64,8 +57,8 @@ export default function App() {
 
   useEffect(() => {
     if (!coupleId) return;
-    setDoc(doc(db, "couples", coupleId), { images, tasks, events, budgetItems, guests, weddingDate });
-  }, [images, tasks, events, budgetItems, guests, weddingDate, coupleId]);
+    setDoc(doc(db, "couples", coupleId), { images, tasks, events, budget, guests, weddingDate });
+  }, [images, tasks, events, budget, guests, weddingDate, coupleId]);
 
   const login = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
@@ -79,14 +72,10 @@ export default function App() {
 
   const joinCouple = () => setCoupleId(inputCoupleId);
 
-  const baseDate = new Date();
-  baseDate.setMonth(baseDate.getMonth() + monthOffset);
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
 
   const dday = weddingDate ? Math.ceil((new Date(weddingDate) - new Date())/(1000*60*60*24)) : null;
-  const totalBudget = budgetItems.reduce((a,b)=>a + b.cost,0);
 
   if (!user) {
     return (
@@ -123,9 +112,13 @@ export default function App() {
         ))}
       </div>
 
+      {/* 홈 */}
       {tab === "home" && (
         <div>
+
+          {/* 사진 */}
           {images[0] && <img src={images[0]} style={{ width:"100%", borderRadius:"20px" }} />}
+
           <label style={{ display:"block", textAlign:"center", margin:"10px" }}>
             사진 변경
             <input type="file" style={{ display:"none" }} onChange={(e)=>{
@@ -136,62 +129,45 @@ export default function App() {
             }} />
           </label>
 
-          <div style={{ background:"white", padding:"20px", borderRadius:"20px", textAlign:"center", marginBottom:"20px" }}>
+          {/* D-day */}
+          <div style={{ background:"white", padding:"20px", borderRadius:"20px", marginBottom:"20px", textAlign:"center" }}>
             <h2>D-{dday ?? "?"}</h2>
             <input type="date" onChange={(e)=>setWeddingDate(e.target.value)} />
           </div>
 
+          {/* 캘린더 */}
           <div style={{ background:"white", padding:"20px", borderRadius:"20px" }}>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <button onClick={()=>setMonthOffset(monthOffset-1)}>◀</button>
-              <h3>{year}년 {month+1}월</h3>
-              <button onClick={()=>setMonthOffset(monthOffset+1)}>▶</button>
-            </div>
-
+            <h3>{today.getMonth()+1}월</h3>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"5px" }}>
               {[...Array(daysInMonth)].map((_,i)=>{
-                const date = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+                const date = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
                 const hasEvent = events.find(e=>e.date===date);
                 return (
-                  <div key={i} onClick={()=>setSelectedDate(date)} style={{ padding:"12px", borderRadius:"10px", background:hasEvent?"#ffccd5":"#f9f9f9" }}>
-                    {i+1}
-                  </div>
+                  <div key={i} style={{ padding:"12px", background:hasEvent?"#ffccd5":"#f9f9f9", borderRadius:"10px" }}>{i+1}</div>
                 );
               })}
             </div>
-
-            {selectedDate && (
-              <div style={{ marginTop:"10px" }}>
-                <h4>{selectedDate}</h4>
-                {events.filter(e=>e.date===selectedDate).map((e,i)=>(
-                  <div key={i}>{e.text}</div>
-                ))}
-              </div>
-            )}
 
             <input placeholder="일정" onChange={(e)=>setEventText(e.target.value)} />
             <input type="date" onChange={(e)=>setEventDate(e.target.value)} />
             <button onClick={()=>setEvents([...events,{text:eventText,date:eventDate}])}>추가</button>
           </div>
+
         </div>
       )}
 
+      {/* 할일 */}
       {tab === "tasks" && (
         <div>
+
+          {/* 예산 */}
           <div style={{ background:"white", padding:"10px", borderRadius:"10px", marginBottom:"10px" }}>
-            💰 총 예산: {totalBudget}
-            <div>
-              <input placeholder="항목" onChange={(e)=>setBudgetName(e.target.value)} />
-              <input placeholder="금액" type="number" onChange={(e)=>setBudgetCost(e.target.value)} />
-              <button onClick={()=>setBudgetItems([...budgetItems,{name:budgetName,cost:+budgetCost}])}>추가</button>
-            </div>
+            💰 예산: <input type="number" onChange={(e)=>setBudget(+e.target.value)} />
           </div>
 
+          {/* 하객 */}
           <div style={{ background:"white", padding:"10px", borderRadius:"10px", marginBottom:"10px" }}>
-            👥 하객 ({guests.length})
-            <input placeholder="이름" onChange={(e)=>setGuestName(e.target.value)} />
-            <button onClick={()=>setGuests([...guests,guestName])}>추가</button>
-            {guests.map((g,i)=>(<div key={i}>{g}</div>))}
+            👥 하객수: <input type="number" onChange={(e)=>setGuests(+e.target.value)} />
           </div>
 
           <select onChange={(e)=>setCategory(e.target.value)}>
@@ -219,9 +195,11 @@ export default function App() {
               </div>
             </div>
           ))}
+
         </div>
       )}
 
+      {/* 플로팅 버튼 */}
       <button onClick={createCouple} style={{ position:"fixed", bottom:"20px", right:"20px", background:"#ff8fa3", color:"white", border:"none", padding:"16px", borderRadius:"50%" }}>
         +
       </button>
