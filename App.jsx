@@ -219,7 +219,7 @@ export default function App() {
         <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
           <h3>💰 예산: {totalBudget}원</h3>
           <input placeholder="항목" value={budgetName} onChange={e=>setBudgetName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
-          <input placeholder="금액" type="number" value={budgetCost} onChange={e=>setBudgetCost(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd', marginRight:'5px'}}/>
+          <input placeholder="금액" type="number" value={budgetCost} onChange={e=>setBudgetCost(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", marginRight:"5px"}}/>
           <button onClick={()=>{setBudgetItems([...budgetItems,{name:budgetName,cost:+budgetCost}]); setBudgetName(""); setBudgetCost("")}} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
           <div style={{marginTop:"10px"}}>
             {budgetItems.map((b,i)=><div key={i} style={{display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #eee"}}>{b.name} - {b.cost}원 <button onClick={()=>setBudgetItems(budgetItems.filter(x=>x!==b))} style={{padding:"4px 8px", borderRadius:"8px", background:"#ff6f91", color:"#fff", border:"none", cursor:"pointer"}}>삭제</button></div>)}
