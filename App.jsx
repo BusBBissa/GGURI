@@ -411,72 +411,99 @@ function GuestsTab({ coupleId }) {
 function BudgetTab({ coupleId }) {
   const [budgetItems, setBudgetItems] = useState([]);
   const [budgetName, setBudgetName] = useState("");
-  const [budgetCost, setBudgetCost] = useState("");
+  const [budgetCost, setBudgetCost] = useState("");  
 
-  // Firestore에서 불러오기
+  // LocalStorage 키
+  const storageKey = `budget_${coupleId}`;
+
+  // 불러오기
   useEffect(() => {
-    if (!coupleId) return;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) setBudgetItems(JSON.parse(saved));
+
     const load = async () => {
-      const snap = await getDoc(doc(db, "couples", coupleId));
+      const snap = await getDoc(doc(db,"couples",coupleId));
       if (snap.exists()) setBudgetItems(snap.data().budgetItems || []);
     };
     load();
   }, [coupleId]);
 
-  // Firestore에 저장
+  // 저장
   useEffect(() => {
-    if (!coupleId) return;
-    updateDoc(doc(db, "couples", coupleId), { budgetItems });
+    localStorage.setItem(storageKey, JSON.stringify(budgetItems));
+    updateDoc(doc(db,"couples",coupleId), {budgetItems});
   }, [budgetItems, coupleId]);
 
-  // 삭제
-  const deleteItem = (item) => {
-    setBudgetItems(prev => prev.filter(b => b !== item));
+  // 항목 추가
+  const addItem = () => {
+    if (!budgetName || !budgetCost) return;
+    setBudgetItems(prev => [...prev,{name:budgetName,cost:Number(budgetCost)}]);
+    setBudgetName(""); setBudgetCost("");
   };
 
-  // 총액
-  const totalBudget = budgetItems.reduce((acc, b) => acc + Number(b.cost || 0), 0);
+  // 항목 삭제
+  const deleteItem = (item) => setBudgetItems(prev => prev.filter(i=>i!==item));
+
+  // 2단 배치
+  const half = Math.ceil(budgetItems.length/2);
+  const left = budgetItems.slice(0, half);
+  const right = budgetItems.slice(half);
+
+  const totalBudget = budgetItems.reduce((acc,b)=>acc+Number(b.cost||0),0);
 
   return (
     <div style={{background:"white", padding:"15px", borderRadius:"20px"}}>
       {/* 입력창 */}
-      <div style={{display:"flex", gap:"5px", marginBottom:"15px", flexWrap:"wrap"}}>
-        <input placeholder="항목명" value={budgetName} onChange={e=>setBudgetName(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}/>
-        <input placeholder="금액" type="number" value={budgetCost} onChange={e=>setBudgetCost(e.target.value)} style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd"}}/>
-        <button onClick={()=>{
-          if(!budgetName || !budgetCost) return;
-          setBudgetItems(prev => [...prev,{name:budgetName, cost:Number(budgetCost)}]);
-          setBudgetName(""); setBudgetCost("");
-        }} style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}>➕ 추가</button>
+      <div style={{display:"flex", gap:"5px", marginBottom:"10px"}}>
+        <input
+          placeholder="항목명"
+          value={budgetName}
+          onChange={e=>setBudgetName(e.target.value)}
+          style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", flex:1}}
+        />
+        <input
+          placeholder="금액"
+          type="number"
+          value={budgetCost}
+          onChange={e=>setBudgetCost(e.target.value)}
+          style={{padding:"8px", borderRadius:"10px", border:"1px solid #ddd", width:"100px"}}
+        />
+        <button
+          onClick={addItem}
+          style={{padding:"8px 15px", borderRadius:"12px", background:"#ff8fa3", color:"#fff", border:"none", cursor:"pointer"}}
+        >
+          ➕ 추가
+        </button>
       </div>
 
       {/* 총액 */}
-      <div style={{marginBottom:"15px", fontWeight:"bold"}}>
+      <div style={{marginBottom:"10px", fontWeight:"bold"}}>
         총 예산: {totalBudget.toLocaleString()}원
       </div>
 
-      {/* 2단 카드형 리스트 */}
-      <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"10px"}}>
-        {budgetItems.map((b,i)=>(
-          <div key={i} style={{
-            padding:"10px",
-            borderRadius:"12px",
-            background:"#fff0f5",
-            display:"flex",
-            justifyContent:"space-between",
-            alignItems:"center",
-            boxShadow:"0 2px 5px rgba(0,0,0,0.05)"
-          }}>
-            <span>{b.name} - {Number(b.cost).toLocaleString()}원</span>
-            <button onClick={()=>deleteItem(b)} style={{
-              background:"red",
-              border:"none",
-              color:"#fff",
-              borderRadius:"6px",
-              padding:"2px 6px",
-              cursor:"pointer",
-              fontSize:"12px"
-            }}>×</button>
+      {/* 2단 리스트 */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px"}}>
+        {[left,right].map((col,idx)=>(
+          <div key={idx}>
+            {col.map((b,i)=>(
+              <div key={i} style={{
+                display:"flex", justifyContent:"space-between", alignItems:"center",
+                padding:"8px", margin:"5px 0", borderRadius:"12px", background:"#f9f9f9",
+                boxShadow:"0 1px 3px rgba(0,0,0,0.1)"
+              }}>
+                {/* 왼쪽: 항목명 */}
+                <span style={{flex:1}}>{b.name}</span>
+
+                {/* 오른쪽: 금액 + 삭제 */}
+                <div style={{display:"flex", gap:"5px", alignItems:"center"}}>
+                  <span>{Number(b.cost).toLocaleString()}원</span>
+                  <button onClick={()=>deleteItem(b)} style={{
+                    padding:"2px 6px", borderRadius:"6px", background:"#ffb3c1",
+                    border:"none", cursor:"pointer"
+                  }}>❌</button>
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </div>
